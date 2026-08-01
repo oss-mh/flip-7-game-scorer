@@ -1,3 +1,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Native postinstall scripts are blocked by default; only allow ones we've
+# checked. sharp = Next.js image optimization, unrs-resolver = eslint's
+# import resolver. Both ship pure-JS/WASM fallbacks if left disallowed.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
