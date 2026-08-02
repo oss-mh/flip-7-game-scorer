@@ -9,6 +9,7 @@ import {
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type GameEvent } from "../events.js";
 import { fold } from "../reduce.js";
+import { nextResolution } from "../selectors.js";
 
 let seq = 0;
 function nextSeq(): number {
@@ -49,6 +50,19 @@ function modifierDealt(
     t: "CardDealt",
     playerId,
     card: createModifierCard(modifier, copyIndex),
+  };
+}
+
+function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
+}
+
+function flipThreeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("flipThree", copyIndex),
   };
 }
 
@@ -205,10 +219,6 @@ describe("CardDealt — modifier cards", () => {
 });
 
 describe("CardDealt — Freeze", () => {
-  function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
-    return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
-  }
-
   it("queues an awaiting-target resolution instead of joining either card row", () => {
     const state = fold([...setup, freezeDealt("alice")]);
     const alice = state.currentRound?.players["alice"];
@@ -235,17 +245,93 @@ describe("CardDealt — Freeze", () => {
   });
 });
 
-describe("CardDealt — cards not yet handled", () => {
-  it("throws for Flip Three action cards, which land in a later M2 issue", () => {
-    const event: GameEvent = {
-      ...envelope(),
-      t: "CardDealt",
-      playerId: "alice",
-      card: createActionCard("flipThree", 1),
-    };
-    expect(() => fold([...setup, event])).toThrow(DomainError);
+describe("CardDealt — Flip Three", () => {
+  it("queues a forced-draw-remaining resolution for three cards, without joining either card row", () => {
+    const state = fold([...setup, flipThreeDealt("alice")]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.numberCards).toEqual([]);
+    expect(alice?.modifierCards).toEqual([]);
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 3 },
+    ]);
   });
 
+  it("records the card in the round's cardsDealt log", () => {
+    const state = fold([...setup, flipThreeDealt("alice")]);
+    expect(state.currentRound?.cardsDealt).toEqual([createActionCard("flipThree", 1)]);
+  });
+
+  it("counts a number card toward the three and keeps it queued", () => {
+    const state = fold([...setup, flipThreeDealt("alice"), cardDealt("alice", 5)]);
+    expect(nextResolution(state)).toEqual({
+      kind: "forced-draw-remaining",
+      playerId: "alice",
+      cardsRemaining: 2,
+    });
+    expect(state.currentRound?.players["alice"]?.numberCards).toEqual([createNumberCard(5, 1)]);
+  });
+
+  it("counts a modifier card toward the three", () => {
+    const state = fold([...setup, flipThreeDealt("alice"), modifierDealt("alice", 4)]);
+    expect(nextResolution(state)).toEqual({
+      kind: "forced-draw-remaining",
+      playerId: "alice",
+      cardsRemaining: 2,
+    });
+  });
+
+  it("counts an action card toward the three and queues its own resolution behind the forced draw", () => {
+    const state = fold([...setup, flipThreeDealt("alice"), freezeDealt("alice")]);
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 2 },
+      { kind: "awaiting-target", card: createActionCard("freeze", 1), sourcePlayerId: "alice" },
+    ]);
+  });
+
+  it("clears the resolution once all three cards have landed", () => {
+    const state = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      cardDealt("alice", 5),
+      modifierDealt("alice", 4),
+      cardDealt("alice", 9),
+    ]);
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+    expect(state.currentRound?.players["alice"]?.numberCards).toEqual([
+      createNumberCard(5, 1),
+      createNumberCard(9, 1),
+    ]);
+  });
+
+  it("allows normal dealing to that player again once the three land", () => {
+    const state = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 9),
+      cardDealt("alice", 11),
+      cardDealt("alice", 2),
+    ]);
+    expect(state.currentRound?.players["alice"]?.numberCards).toHaveLength(4);
+  });
+
+  it("rejects dealing to a different player while the forced draw is unresolved", () => {
+    const events = [...setup, flipThreeDealt("alice"), cardDealt("bob", 5)];
+    expect(() => fold(events)).toThrow(DomainError);
+  });
+
+  it("still busts the player on a duplicate drawn as part of the forced three", () => {
+    const state = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+    ]);
+    expect(state.currentRound?.players["alice"]?.status).toBe("busted");
+  });
+});
+
+describe("CardDealt — cards not yet handled", () => {
   it("throws for Second Chance action cards, which land in a later M2 issue", () => {
     const event: GameEvent = {
       ...envelope(),

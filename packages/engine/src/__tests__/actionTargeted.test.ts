@@ -43,6 +43,15 @@ function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
   return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
 }
 
+function flipThreeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("flipThree", copyIndex),
+  };
+}
+
 function playerStayed(playerId: string): GameEvent {
   return { ...envelope(), t: "PlayerStayed", playerId };
 }
@@ -181,14 +190,25 @@ describe("ActionTargeted — Freeze", () => {
   });
 
   it("leaves items behind the resolved one untouched", () => {
-    // A second Freeze dealt to a different player while the first is still
-    // pending — nothing yet stops the dealer from doing this — nests behind
-    // it on the queue and survives resolving the front item.
-    const dealt = fold([...setup, freezeDealt("alice", 1), freezeDealt("bob", 2)]);
-    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "alice"));
+    // Two Freezes drawn as part of the same Flip Three (#60) both nest
+    // behind the forced draw; once the third card lands and the forced
+    // draw clears, the first becomes the front of the queue and the
+    // second stays queued behind it.
+    const dealt = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      freezeDealt("alice", 1),
+      freezeDealt("alice", 2),
+      cardDealt("alice", 9),
+    ]);
+    expect(dealt.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: createActionCard("freeze", 1), sourcePlayerId: "alice" },
+      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "alice" },
+    ]);
 
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "bob"));
     expect(next.currentRound?.pendingResolutions).toEqual([
-      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "bob" },
+      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "alice" },
     ]);
   });
 

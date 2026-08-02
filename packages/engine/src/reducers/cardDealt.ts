@@ -4,9 +4,15 @@ import { requireActivePlayerRound, requireCurrentRound, withCurrentRound } from 
 
 import type { CardDealtEvent } from "../events.js";
 import type { PlayerId } from "../player.js";
-import type { GameState, PlayerRoundState, RoundState } from "../state.js";
+import type {
+  ForcedDrawRemainingResolution,
+  GameState,
+  PlayerRoundState,
+  RoundState,
+} from "../state.js";
 
 const FLIP_7_HAND_SIZE = 7;
+const FLIP_THREE_DRAW_COUNT = 3;
 
 /**
  * Flip 7 ends the round immediately for everyone. The player who flipped it
@@ -27,10 +33,38 @@ function bankOtherActivePlayers(
   return updated;
 }
 
+/**
+ * The card that was just dealt fills one of the three slots a Flip Three
+ * owes `pending.playerId` — decrement it, dropping it off the front of the
+ * queue once all three have landed. Anything the dealt card itself queued
+ * (a nested Freeze or Flip Three — #62) was appended behind it and is left
+ * untouched.
+ */
+function consumeForcedDraw(round: RoundState, pending: ForcedDrawRemainingResolution): RoundState {
+  const cardsRemaining = pending.cardsRemaining - 1;
+  const rest = round.pendingResolutions.slice(1);
+  const pendingResolutions = cardsRemaining > 0 ? [{ ...pending, cardsRemaining }, ...rest] : rest;
+  return { ...round, pendingResolutions };
+}
+
 export function applyCardDealt(state: GameState, event: CardDealtEvent): GameState {
   const round = requireCurrentRound(state);
+
+  const pending = round.pendingResolutions[0];
+  let forcedDraw: ForcedDrawRemainingResolution | null = null;
+  if (pending) {
+    if (pending.kind === "forced-draw-remaining" && pending.playerId === event.playerId) {
+      forcedDraw = pending;
+    } else {
+      throw new DomainError(
+        `Cannot deal to "${event.playerId}" while a pending resolution is unresolved`,
+      );
+    }
+  }
+
   const playerRound = requireActivePlayerRound(round, event.playerId);
 
+  let updatedRound: RoundState;
   switch (event.card.kind) {
     case "number": {
       const card = event.card;
@@ -51,13 +85,12 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
           )
         : { ...round.players, [event.playerId]: updatedPlayerRound };
 
-      const updatedRound: RoundState = {
+      updatedRound = {
         ...round,
         players,
         cardsDealt: [...round.cardsDealt, card],
       };
-
-      return withCurrentRound(state, updatedRound);
+      break;
     }
     case "modifier": {
       const card = event.card;
@@ -70,22 +103,21 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
         modifierCards: [...playerRound.modifierCards, card],
       };
 
-      const updatedRound: RoundState = {
+      updatedRound = {
         ...round,
         players: { ...round.players, [event.playerId]: updatedPlayerRound },
         cardsDealt: [...round.cardsDealt, card],
       };
-
-      return withCurrentRound(state, updatedRound);
+      break;
     }
     case "action": {
       const card = event.card;
       switch (card.action) {
-        // A revealed Freeze doesn't join either card row — action cards
-        // aren't held, they interrupt — so it only needs recording in the
-        // deck log and queuing for the source player to pick a target (#20).
-        case "freeze": {
-          const updatedRound: RoundState = {
+        // Neither Freeze nor Flip Three joins a card row — action cards
+        // aren't held, they interrupt — so each only needs recording in
+        // the deck log and queuing its own resolution.
+        case "freeze":
+          updatedRound = {
             ...round,
             cardsDealt: [...round.cardsDealt, card],
             pendingResolutions: [
@@ -93,9 +125,21 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
               { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
             ],
           };
-          return withCurrentRound(state, updatedRound);
-        }
+          break;
         case "flipThree":
+          updatedRound = {
+            ...round,
+            cardsDealt: [...round.cardsDealt, card],
+            pendingResolutions: [
+              ...round.pendingResolutions,
+              {
+                kind: "forced-draw-remaining",
+                playerId: event.playerId,
+                cardsRemaining: FLIP_THREE_DRAW_COUNT,
+              },
+            ],
+          };
+          break;
         case "secondChance":
           throw new DomainError(
             `CardDealt for "${card.action}" action cards is not implemented yet (lands in M2)`,
@@ -105,10 +149,14 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
           throw new DomainError(`Unknown action type: ${JSON.stringify(exhaustive)}`);
         }
       }
+      break;
     }
     default: {
       const exhaustive: never = event.card;
       throw new DomainError(`Unknown card kind: ${JSON.stringify(exhaustive)}`);
     }
   }
+
+  const finalRound = forcedDraw ? consumeForcedDraw(updatedRound, forcedDraw) : updatedRound;
+  return withCurrentRound(state, finalRound);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createModifierCard, createNumberCard } from "../cards.js";
+import { createActionCard, createModifierCard, createNumberCard } from "../cards.js";
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type GameEvent } from "../events.js";
 import { fold } from "../reduce.js";
@@ -99,5 +99,16 @@ describe("PlayerStayed", () => {
 
   it("rejects staying before any round has started", () => {
     expect(() => fold([gameCreated(), playerStayed("alice")])).toThrow(DomainError);
+  });
+
+  it("rejects staying mid-Flip-Three, even for the player not subject to the forced draw", () => {
+    const events: GameEvent[] = [
+      ...setup,
+      cardDealt("alice", createNumberCard(5, 1)),
+      cardDealt("bob", createNumberCard(3, 1)),
+      { ...envelope(), t: "CardDealt", playerId: "alice", card: createActionCard("flipThree", 1) },
+    ];
+    expect(() => fold([...events, playerStayed("alice")])).toThrow(DomainError);
+    expect(() => fold([...events, playerStayed("bob")])).toThrow(DomainError);
   });
 });
