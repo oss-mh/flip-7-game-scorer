@@ -66,6 +66,15 @@ function flipThreeDealt(playerId: string, copyIndex = 1): GameEvent {
   };
 }
 
+function secondChanceDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("secondChance", copyIndex),
+  };
+}
+
 const setup = [gameCreated(), roundStarted("alice")];
 
 describe("CardDealt — number cards", () => {
@@ -403,17 +412,90 @@ describe("CardDealt — Flip Three", () => {
   });
 });
 
-describe("CardDealt — cards not yet handled", () => {
-  it("throws for Second Chance action cards, which land in a later M2 issue", () => {
-    const event: GameEvent = {
-      ...envelope(),
-      t: "CardDealt",
-      playerId: "alice",
-      card: createActionCard("secondChance", 1),
-    };
-    expect(() => fold([...setup, event])).toThrow(DomainError);
+describe("CardDealt — Second Chance", () => {
+  it("holds a Second Chance instead of joining either card row", () => {
+    const state = fold([...setup, secondChanceDealt("alice")]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.heldSecondChance).toEqual(createActionCard("secondChance", 1));
+    expect(alice?.numberCards).toEqual([]);
+    expect(alice?.modifierCards).toEqual([]);
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
   });
 
+  it("records the card in the round's cardsDealt log", () => {
+    const state = fold([...setup, secondChanceDealt("alice")]);
+    expect(state.currentRound?.cardsDealt).toEqual([createActionCard("secondChance", 1)]);
+  });
+
+  it("leaves the drawing player active", () => {
+    const state = fold([...setup, secondChanceDealt("alice")]);
+    expect(state.currentRound?.players["alice"]?.status).toBe("active");
+  });
+
+  it("intercepts a duplicate: consumes the held Second Chance, discards the duplicate, and keeps the player active", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+    ]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.status).toBe("active");
+    expect(alice?.heldSecondChance).toBeNull();
+    expect(alice?.numberCards).toEqual([createNumberCard(5, 1)]);
+  });
+
+  it("still records the discarded duplicate in the round's cardsDealt log", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+    ]);
+    expect(state.currentRound?.cardsDealt).toEqual([
+      createActionCard("secondChance", 1),
+      createNumberCard(5, 1),
+      createNumberCard(5, 2),
+    ]);
+  });
+
+  it("leaves the saved player's other cards untouched", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 7),
+      cardDealt("alice", 5, 2),
+    ]);
+    expect(state.currentRound?.players["alice"]?.numberCards).toEqual([
+      createNumberCard(5, 1),
+      createNumberCard(7, 1),
+    ]);
+  });
+
+  it("does not abort a Flip Three sequence when Second Chance intercepts a mid-sequence duplicate", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("alice"),
+      flipThreeDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+      cardDealt("alice", 9),
+    ]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.status).toBe("active");
+    expect(alice?.heldSecondChance).toBeNull();
+    expect(alice?.numberCards).toEqual([createNumberCard(5, 1), createNumberCard(9, 1)]);
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+
+  it("throws when a player who already holds a Second Chance draws another (lands in a later M2 issue)", () => {
+    const events = [...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)];
+    expect(() => fold(events)).toThrow(DomainError);
+  });
+});
+
+describe("CardDealt — cards not yet handled", () => {
   it("throws for a genuinely unknown card kind", () => {
     const event = {
       ...envelope(),

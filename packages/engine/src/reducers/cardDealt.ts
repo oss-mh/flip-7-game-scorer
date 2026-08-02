@@ -73,6 +73,21 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
     case "number": {
       const card = event.card;
       const isDuplicate = playerRound.numberCards.some((existing) => existing.value === card.value);
+
+      if (isDuplicate && playerRound.heldSecondChance) {
+        // Second Chance intercepts the bust: both cards are discarded (the
+        // duplicate never joins numberCards), the player's existing hand is
+        // untouched, and they stay active — see #63. Not a bust, so a Flip
+        // Three in progress isn't aborted by this card either.
+        const updatedPlayerRound: PlayerRoundState = { ...playerRound, heldSecondChance: null };
+        updatedRound = {
+          ...round,
+          players: { ...round.players, [event.playerId]: updatedPlayerRound },
+          cardsDealt: [...round.cardsDealt, card],
+        };
+        break;
+      }
+
       const numberCards = [...playerRound.numberCards, card];
       const hasFlipped7 = !isDuplicate && numberCards.length === FLIP_7_HAND_SIZE;
       abortsForcedDraw = isDuplicate || hasFlipped7;
@@ -145,10 +160,24 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
             ],
           };
           break;
-        case "secondChance":
-          throw new DomainError(
-            `CardDealt for "${card.action}" action cards is not implemented yet (lands in M2)`,
-          );
+        case "secondChance": {
+          // Holding one doesn't need a resolution queued — there's no
+          // target to pick — so it just sits on the player's own state.
+          // A second, duplicate Second Chance needs reassignment to
+          // another player, which is a later M2 issue.
+          if (playerRound.heldSecondChance) {
+            throw new DomainError(
+              `CardDealt for a duplicate Second Chance held by "${event.playerId}" is not implemented yet (lands in a later M2 issue)`,
+            );
+          }
+          const updatedPlayerRound: PlayerRoundState = { ...playerRound, heldSecondChance: card };
+          updatedRound = {
+            ...round,
+            players: { ...round.players, [event.playerId]: updatedPlayerRound },
+            cardsDealt: [...round.cardsDealt, card],
+          };
+          break;
+        }
         default: {
           const exhaustive: never = card.action;
           throw new DomainError(`Unknown action type: ${JSON.stringify(exhaustive)}`);
