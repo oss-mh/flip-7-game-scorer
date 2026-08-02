@@ -1,0 +1,154 @@
+[
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:00.000Z",
+    "seq": 1,
+    "t": "GameCreated",
+    "players": [
+      { "id": "alice", "name": "Alice" },
+      { "id": "bob", "name": "Bob" },
+      { "id": "cara", "name": "Cara" }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:01.000Z",
+    "seq": 2,
+    "t": "RoundStarted",
+    "dealerId": "alice"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:02.000Z",
+    "seq": 3,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-4-1", "kind": "number", "value": 4 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:03.000Z",
+    "seq": 4,
+    "t": "CardDealt",
+    "playerId": "bob",
+    "card": { "id": "num-2-1", "kind": "number", "value": 2 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:04.000Z",
+    "seq": 5,
+    "t": "CardDealt",
+    "playerId": "cara",
+    "card": { "id": "num-9-1", "kind": "number", "value": 9 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:05.000Z",
+    "seq": 6,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-6-1", "kind": "number", "value": 6 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:06.000Z",
+    "seq": 7,
+    "t": "CardDealt",
+    "playerId": "cara",
+    "card": { "id": "num-1-1", "kind": "number", "value": 1 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:07.000Z",
+    "seq": 8,
+    "t": "PlayerStayed",
+    "playerId": "alice"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:08.000Z",
+    "seq": 9,
+    "t": "PlayerStayed",
+    "playerId": "bob"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:09.000Z",
+    "seq": 10,
+    "t": "PlayerStayed",
+    "playerId": "cara"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:10.000Z",
+    "seq": 11,
+    "t": "RoundClosed"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:11.000Z",
+    "seq": 12,
+    "t": "RoundStarted",
+    "dealerId": "bob"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:12.000Z",
+    "seq": 13,
+    "t": "CardDealt",
+    "playerId": "bob",
+    "card": { "id": "num-5-1", "kind": "number", "value": 5 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:13.000Z",
+    "seq": 14,
+    "t": "CardDealt",
+    "playerId": "bob",
+    "card": { "id": "num-5-2", "kind": "number", "value": 5 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:14.000Z",
+    "seq": 15,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-3-1", "kind": "number", "value": 3 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:15.000Z",
+    "seq": 16,
+    "t": "CardDealt",
+    "playerId": "cara",
+    "card": { "id": "num-7-1", "kind": "number", "value": 7 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:16.000Z",
+    "seq": 17,
+    "t": "CardDealt",
+    "playerId": "cara",
+    "card": { "id": "num-2-2", "kind": "number", "value": 2 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:17.000Z",
+    "seq": 18,
+    "t": "PlayerStayed",
+    "playerId": "alice"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:18.000Z",
+    "seq": 19,
+    "t": "PlayerStayed",
+    "playerId": "cara"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T11:00:19.000Z",
+    "seq": 20,
+    "t": "RoundClosed"
+  }
+]

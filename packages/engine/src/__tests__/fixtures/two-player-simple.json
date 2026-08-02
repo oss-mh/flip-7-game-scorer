@@ -1,0 +1,71 @@
+[
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:00.000Z",
+    "seq": 1,
+    "t": "GameCreated",
+    "players": [
+      { "id": "alice", "name": "Alice" },
+      { "id": "bob", "name": "Bob" }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:01.000Z",
+    "seq": 2,
+    "t": "RoundStarted",
+    "dealerId": "alice"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:02.000Z",
+    "seq": 3,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-5-1", "kind": "number", "value": 5 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:03.000Z",
+    "seq": 4,
+    "t": "CardDealt",
+    "playerId": "bob",
+    "card": { "id": "num-8-1", "kind": "number", "value": 8 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:04.000Z",
+    "seq": 5,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-3-1", "kind": "number", "value": 3 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:05.000Z",
+    "seq": 6,
+    "t": "PlayerStayed",
+    "playerId": "alice"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:06.000Z",
+    "seq": 7,
+    "t": "CardDealt",
+    "playerId": "bob",
+    "card": { "id": "num-2-1", "kind": "number", "value": 2 }
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:07.000Z",
+    "seq": 8,
+    "t": "PlayerStayed",
+    "playerId": "bob"
+  },
+  {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:08.000Z",
+    "seq": 9,
+    "t": "RoundClosed"
+  }
+]
