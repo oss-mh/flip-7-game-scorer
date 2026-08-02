@@ -11,11 +11,10 @@ const baseEnvelope = {
 };
 
 // Events whose reducer logic hasn't landed yet — each still throws a typed
-// DomainError naming the issue that implements it. GameCreated, RoundStarted
-// and CardDealt are excluded: their handlers landed in #14, #15 and #16, so
-// they're tested separately below.
+// DomainError naming the issue that implements it. GameCreated, RoundStarted,
+// CardDealt and PlayerStayed are excluded: their handlers landed in #14,
+// #15, #16 and #52, so they're tested separately below.
 const notYetImplementedEvents: readonly GameEvent[] = [
-  { ...baseEnvelope, t: "PlayerStayed", playerId: "alice" },
   {
     ...baseEnvelope,
     t: "ActionTargeted",
