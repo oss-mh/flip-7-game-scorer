@@ -161,14 +161,20 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
           };
           break;
         case "secondChance": {
-          // Holding one doesn't need a resolution queued — there's no
-          // target to pick — so it just sits on the player's own state.
-          // A second, duplicate Second Chance needs reassignment to
-          // another player, which is a later M2 issue.
+          // Holding your first one doesn't need a resolution queued —
+          // there's no target to pick — so it just sits on the player's
+          // own state. A second, duplicate one needs to be passed to
+          // another eligible player, which does need a target (#17).
           if (playerRound.heldSecondChance) {
-            throw new DomainError(
-              `CardDealt for a duplicate Second Chance held by "${event.playerId}" is not implemented yet (lands in a later M2 issue)`,
-            );
+            updatedRound = {
+              ...round,
+              cardsDealt: [...round.cardsDealt, card],
+              pendingResolutions: [
+                ...round.pendingResolutions,
+                { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
+              ],
+            };
+            break;
           }
           const updatedPlayerRound: PlayerRoundState = { ...playerRound, heldSecondChance: card };
           updatedRound = {

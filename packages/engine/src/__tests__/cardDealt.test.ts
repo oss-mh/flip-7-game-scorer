@@ -489,9 +489,25 @@ describe("CardDealt — Second Chance", () => {
     expect(state.currentRound?.pendingResolutions).toEqual([]);
   });
 
-  it("throws when a player who already holds a Second Chance draws another (lands in a later M2 issue)", () => {
-    const events = [...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)];
-    expect(() => fold(events)).toThrow(DomainError);
+  it("queues an awaiting-target resolution when a player who already holds one draws another (#17)", () => {
+    const state = fold([...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.heldSecondChance).toEqual(createActionCard("secondChance", 1));
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      {
+        kind: "awaiting-target",
+        card: createActionCard("secondChance", 2),
+        sourcePlayerId: "alice",
+      },
+    ]);
+  });
+
+  it("records the duplicate in the round's cardsDealt log", () => {
+    const state = fold([...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)]);
+    expect(state.currentRound?.cardsDealt).toEqual([
+      createActionCard("secondChance", 1),
+      createActionCard("secondChance", 2),
+    ]);
   });
 });
 

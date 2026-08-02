@@ -2,14 +2,37 @@ import { DomainError } from "../errors.js";
 
 import { applyFreeze } from "./freeze.js";
 import { requireActivePlayerRound, requireCurrentRound, withCurrentRound } from "./roundHelpers.js";
+import { applySecondChanceReassignment } from "./secondChance.js";
 
 import type { ActionCard } from "../cards.js";
 import type { ActionTargetedEvent } from "../events.js";
+import type { PlayerId } from "../player.js";
 import type { GameState, PlayerRoundState, RoundState } from "../state.js";
 
 /**
+ * Active is necessary for every action kind; a duplicate Second Chance also
+ * excludes anyone already holding one (#17) — which, since the source
+ * always holds one themselves, is what rules out self-targeting for this
+ * card without needing a separate check.
+ */
+function requireEligibleTarget(
+  round: RoundState,
+  card: ActionCard,
+  targetId: PlayerId,
+): PlayerRoundState {
+  const targetRound = requireActivePlayerRound(round, targetId);
+  if (card.action === "secondChance" && targetRound.heldSecondChance) {
+    throw new DomainError(`"${targetId}" already holds a Second Chance and cannot receive another`);
+  }
+  return targetRound;
+}
+
+/**
  * Applies whatever effect resolving `card` onto `targetRound` has. Each
- * action kind owns its own handler; only "freeze" (#59) exists so far.
+ * action kind owns its own handler; "flipThree" never produces an
+ * awaiting-target item in the first place (it forces the drawing player's
+ * own draws instead — #60), so that branch only guards against a bug
+ * elsewhere ever queuing one.
  */
 function applyActionCardEffect(
   round: RoundState,
@@ -19,8 +42,9 @@ function applyActionCardEffect(
   switch (card.action) {
     case "freeze":
       return applyFreeze(round, targetRound);
-    case "flipThree":
     case "secondChance":
+      return applySecondChanceReassignment(round, card, targetRound);
+    case "flipThree":
       throw new DomainError(
         `ActionTargeted for "${card.action}" is not implemented yet (lands in M2)`,
       );
@@ -34,11 +58,7 @@ function applyActionCardEffect(
 /**
  * Validates and consumes the "awaiting-target" item at the front of the
  * resolution queue — see #58's `nextResolution`. Only the source player's
- * own card can be resolved here, and only onto an active player: busted,
- * stayed and frozen players are never valid targets, and an active source
- * player is always themselves a valid target, which is what makes
- * self-targeting available (and, when they're the only active player left,
- * forced — nothing else in `players` would pass this check).
+ * own card can be resolved here, and only onto an eligible target.
  */
 export function applyActionTargeted(state: GameState, event: ActionTargetedEvent): GameState {
   const round = requireCurrentRound(state);
@@ -53,7 +73,7 @@ export function applyActionTargeted(state: GameState, event: ActionTargetedEvent
     );
   }
 
-  const targetRound = requireActivePlayerRound(round, event.targetId);
+  const targetRound = requireEligibleTarget(round, pending.card, event.targetId);
 
   const dequeuedRound: RoundState = {
     ...round,

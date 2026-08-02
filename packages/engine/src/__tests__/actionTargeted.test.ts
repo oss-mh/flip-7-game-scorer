@@ -56,6 +56,15 @@ function flipThreeDealt(playerId: string, copyIndex = 1): GameEvent {
   };
 }
 
+function secondChanceDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("secondChance", copyIndex),
+  };
+}
+
 function playerStayed(playerId: string): GameEvent {
   return { ...envelope(), t: "PlayerStayed", playerId };
 }
@@ -268,29 +277,27 @@ describe("ActionTargeted — Freeze", () => {
     expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
   });
 
-  // Nothing deals Flip Three or Second Chance yet, so an awaiting-target
-  // item for either has to be hand-built to exercise these branches ahead
-  // of their own M2 issues.
-  it.each(["flipThree", "secondChance"] as const)(
-    "throws for %s, which doesn't have a target-resolution handler yet",
-    (action) => {
-      const base = fold(setup);
-      const round = base.currentRound;
-      if (!round) {
-        throw new Error("expected a round");
-      }
-      const card = createActionCard(action, 1);
-      const state: GameState = {
-        ...base,
-        currentRound: {
-          ...round,
-          pendingResolutions: [{ kind: "awaiting-target", card, sourcePlayerId: "alice" }],
-        },
-      };
+  // Flip Three never actually produces an awaiting-target item (it forces
+  // the drawing player's own draws instead — #60), so this only guards
+  // against a bug elsewhere ever queuing one; has to be hand-built since
+  // nothing reachable produces it.
+  it("throws for flipThree, which doesn't have a target-resolution handler", () => {
+    const base = fold(setup);
+    const round = base.currentRound;
+    if (!round) {
+      throw new Error("expected a round");
+    }
+    const card = createActionCard("flipThree", 1);
+    const state: GameState = {
+      ...base,
+      currentRound: {
+        ...round,
+        pendingResolutions: [{ kind: "awaiting-target", card, sourcePlayerId: "alice" }],
+      },
+    };
 
-      expect(() => reduce(state, actionTargeted(card, "alice", "bob"))).toThrow(DomainError);
-    },
-  );
+    expect(() => reduce(state, actionTargeted(card, "alice", "bob"))).toThrow(DomainError);
+  });
 
   it("throws for a genuinely unknown action type", () => {
     const base = fold(setup);
@@ -310,5 +317,67 @@ describe("ActionTargeted — Freeze", () => {
     };
 
     expect(() => reduce(state, actionTargeted(card, "alice", "bob"))).toThrow(DomainError);
+  });
+});
+
+describe("ActionTargeted — Second Chance reassignment (#17)", () => {
+  it("passes the duplicate to an eligible active player, who now holds it", () => {
+    const dealt = fold([...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)]);
+    const next = reduce(dealt, actionTargeted(createActionCard("secondChance", 2), "alice", "bob"));
+
+    expect(next.currentRound?.pendingResolutions).toEqual([]);
+    expect(next.currentRound?.players["bob"]?.heldSecondChance).toEqual(
+      createActionCard("secondChance", 2),
+    );
+    expect(next.currentRound?.players["alice"]?.heldSecondChance).toEqual(
+      createActionCard("secondChance", 1),
+    );
+  });
+
+  it("rejects the source targeting themselves, since they already hold one", () => {
+    const dealt = fold([...setup, secondChanceDealt("alice", 1), secondChanceDealt("alice", 2)]);
+    expect(() =>
+      reduce(dealt, actionTargeted(createActionCard("secondChance", 2), "alice", "alice")),
+    ).toThrow(DomainError);
+  });
+
+  it("rejects a recipient who already holds a Second Chance", () => {
+    const dealt = fold([
+      ...setup,
+      secondChanceDealt("bob", 1),
+      secondChanceDealt("alice", 2),
+      secondChanceDealt("alice", 3),
+    ]);
+    expect(() =>
+      reduce(dealt, actionTargeted(createActionCard("secondChance", 3), "alice", "bob")),
+    ).toThrow(DomainError);
+  });
+
+  it("passes to an eligible player when another active player already holds one", () => {
+    const dealt = fold([
+      ...setup,
+      secondChanceDealt("bob", 1),
+      secondChanceDealt("alice", 2),
+      secondChanceDealt("alice", 3),
+    ]);
+    const next = reduce(
+      dealt,
+      actionTargeted(createActionCard("secondChance", 3), "alice", "carol"),
+    );
+    expect(next.currentRound?.players["carol"]?.heldSecondChance).toEqual(
+      createActionCard("secondChance", 3),
+    );
+  });
+
+  it("rejects targeting a player who isn't active", () => {
+    const dealt = fold([
+      ...setup,
+      playerStayed("bob"),
+      secondChanceDealt("alice", 1),
+      secondChanceDealt("alice", 2),
+    ]);
+    expect(() =>
+      reduce(dealt, actionTargeted(createActionCard("secondChance", 2), "alice", "bob")),
+    ).toThrow(DomainError);
   });
 });
