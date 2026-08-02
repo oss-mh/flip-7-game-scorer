@@ -20,6 +20,18 @@ export {
   isNumberCard,
 } from "./cards.js";
 export { DECK_SIZE, createDeck } from "./deck.js";
+export type {
+  ActionTargetedEvent,
+  CardDealtEvent,
+  DeckReshuffledEvent,
+  GameCreatedEvent,
+  GameEvent,
+  ManualScoreEnteredEvent,
+  PlayerStayedEvent,
+  RoundClosedEvent,
+  RoundStartedEvent,
+} from "./events.js";
+export { EVENT_SCHEMA_VERSION } from "./events.js";
 export type { Player, PlayerId } from "./player.js";
 export type {
   GameState,
