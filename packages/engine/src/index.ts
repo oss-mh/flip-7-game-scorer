@@ -19,7 +19,7 @@ export {
   isModifierCard,
   isNumberCard,
 } from "./cards.js";
-export { DECK_SIZE, createDeck } from "./deck.js";
+export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
 export { DomainError } from "./errors.js";
 export type {
   ActionTargetedEvent,
@@ -43,3 +43,4 @@ export type {
   PlayerRoundStatus,
   RoundState,
 } from "./state.js";
+export { DEFAULT_TARGET_SCORE } from "./state.js";

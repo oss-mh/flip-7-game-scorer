@@ -1,4 +1,5 @@
 import { DomainError } from "./errors.js";
+import { applyGameCreated } from "./reducers/gameCreated.js";
 
 import type { GameEvent } from "./events.js";
 import type { GameState } from "./state.js";
@@ -34,7 +35,7 @@ function notImplemented(event: GameEvent, landsIn: string): never {
 export function reduce(state: GameState, event: GameEvent): GameState {
   switch (event.t) {
     case "GameCreated":
-      return notImplemented(event, "#14");
+      return applyGameCreated(event);
     case "RoundStarted":
       return notImplemented(event, "#15");
     case "CardDealt":

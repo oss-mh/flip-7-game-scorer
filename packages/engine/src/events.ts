@@ -27,7 +27,8 @@ interface EventEnvelope {
 export interface GameCreatedEvent extends EventEnvelope {
   readonly t: "GameCreated";
   readonly players: readonly Player[];
-  readonly targetScore: number;
+  /** Omit to use the rulebook default of 200 — see `DEFAULT_TARGET_SCORE`. */
+  readonly targetScore?: number;
 }
 
 export interface RoundStartedEvent extends EventEnvelope {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isActionCard, isModifierCard, isNumberCard } from "../cards.js";
-import { DECK_SIZE, createDeck } from "../deck.js";
+import { DECK_SIZE, createDeck, deckCountForPlayerCount } from "../deck.js";
 
 describe("createDeck", () => {
   it("totals exactly 94 cards", () => {
@@ -54,5 +54,17 @@ describe("createDeck", () => {
     expect(countsByAction.get("freeze")).toBe(3);
     expect(countsByAction.get("flipThree")).toBe(3);
     expect(countsByAction.get("secondChance")).toBe(3);
+  });
+});
+
+describe("deckCountForPlayerCount", () => {
+  it("plays with a single deck up to and including 18 players", () => {
+    expect(deckCountForPlayerCount(2)).toBe(1);
+    expect(deckCountForPlayerCount(18)).toBe(1);
+  });
+
+  it("plays with two decks once there are more than 18 players", () => {
+    expect(deckCountForPlayerCount(19)).toBe(2);
+    expect(deckCountForPlayerCount(30)).toBe(2);
   });
 });

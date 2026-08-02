@@ -10,13 +10,10 @@ const baseEnvelope = {
   seq: 1,
 };
 
-const knownEvents: readonly GameEvent[] = [
-  {
-    ...baseEnvelope,
-    t: "GameCreated",
-    players: [{ id: "alice", name: "Alice" }],
-    targetScore: 200,
-  },
+// Events whose reducer logic hasn't landed yet — each still throws a typed
+// DomainError naming the issue that implements it. GameCreated is excluded:
+// its handler landed in #14, so it's tested separately below.
+const notYetImplementedEvents: readonly GameEvent[] = [
   { ...baseEnvelope, t: "RoundStarted", dealerId: "alice" },
   {
     ...baseEnvelope,
@@ -40,16 +37,20 @@ const knownEvents: readonly GameEvent[] = [
 describe("reduce", () => {
   it("is pure: never mutates the state or event it's given", () => {
     const state = JSON.parse(JSON.stringify(initialState)) as typeof initialState;
-    const event = JSON.parse(JSON.stringify(knownEvents[0]));
+    const [event] = notYetImplementedEvents;
+    if (!event) {
+      throw new Error("expected at least one not-yet-implemented event");
+    }
+    const clonedEvent = JSON.parse(JSON.stringify(event));
     Object.freeze(state);
-    Object.freeze(event);
+    Object.freeze(clonedEvent);
 
-    expect(() => reduce(state, event as GameEvent)).toThrow(DomainError);
+    expect(() => reduce(state, clonedEvent as GameEvent)).toThrow(DomainError);
     expect(state).toEqual(initialState);
   });
 
   it("throws a typed DomainError for every event type not yet implemented", () => {
-    for (const event of knownEvents) {
+    for (const event of notYetImplementedEvents) {
       expect(() => reduce(initialState, event)).toThrow(DomainError);
     }
   });
@@ -66,7 +67,7 @@ describe("fold", () => {
   });
 
   it("is built on top of reduce — folding one event has the same effect as calling reduce directly", () => {
-    const event = knownEvents[0];
+    const event = notYetImplementedEvents[0];
     if (!event) {
       throw new Error("expected at least one known event");
     }

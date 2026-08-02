@@ -41,6 +41,8 @@ export interface RoundState {
 
 export type GameStatus = "active" | "completed";
 
+export const DEFAULT_TARGET_SCORE = 200;
+
 export interface GameState {
   readonly players: readonly Player[];
   readonly targetScore: number;

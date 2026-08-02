@@ -42,3 +42,12 @@ export function createDeck(): readonly Card[] {
 
   return cards;
 }
+
+/**
+ * How many 94-card decks a table of this size plays with. Derived from
+ * player count rather than stored on `GameState`, so it can never drift
+ * out of sync with the roster.
+ */
+export function deckCountForPlayerCount(playerCount: number): 1 | 2 {
+  return playerCount > 18 ? 2 : 1;
+}
