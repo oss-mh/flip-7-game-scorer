@@ -96,6 +96,61 @@ describe("CardDealt — number cards", () => {
   });
 });
 
+describe("CardDealt — Flip 7", () => {
+  function dealSevenUniqueTo(playerId: string): GameEvent[] {
+    return [1, 2, 3, 4, 5, 6, 7].map((value) => cardDealt(playerId, value as NumberValue));
+  }
+
+  it("sets flipped7 on the seventh unique number card", () => {
+    const state = fold([...setup, ...dealSevenUniqueTo("alice")]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.status).toBe("flipped7");
+    expect(alice?.numberCards).toHaveLength(7);
+  });
+
+  it("does not flip on six unique cards", () => {
+    const events = [1, 2, 3, 4, 5, 6].map((value) => cardDealt("alice", value as NumberValue));
+    const state = fold([...setup, ...events]);
+    expect(state.currentRound?.players["alice"]?.status).toBe("active");
+  });
+
+  it("ignores modifier cards when counting toward seven", () => {
+    const events = [
+      modifierDealt("alice", 2),
+      modifierDealt("alice", 4),
+      ...[1, 2, 3, 4, 5, 6].map((value) => cardDealt("alice", value as NumberValue)),
+    ];
+    const state = fold([...setup, ...events]);
+    // Six unique numbers plus two modifiers is not Flip 7.
+    expect(state.currentRound?.players["alice"]?.status).toBe("active");
+  });
+
+  it("ends the round immediately: other active players bank what they have", () => {
+    const events = [
+      cardDealt("bob", 9),
+      ...dealSevenUniqueTo("alice"),
+    ];
+    const state = fold([...setup, ...events]);
+    expect(state.currentRound?.players["bob"]?.status).toBe("stayed");
+    expect(state.currentRound?.players["bob"]?.numberCards).toEqual([createNumberCard(9, 1)]);
+  });
+
+  it("does not touch players who already busted or stayed before the flip", () => {
+    const events = [
+      cardDealt("bob", 3),
+      cardDealt("bob", 3, 2), // bob busts
+      ...dealSevenUniqueTo("alice"),
+    ];
+    const state = fold([...setup, ...events]);
+    expect(state.currentRound?.players["bob"]?.status).toBe("busted");
+  });
+
+  it("rejects dealing further cards to a player who has flipped 7", () => {
+    const events = [...dealSevenUniqueTo("alice"), cardDealt("alice", 8)];
+    expect(() => fold([...setup, ...events])).toThrow(DomainError);
+  });
+});
+
 describe("CardDealt — modifier cards", () => {
   it("appends to a separate row from number cards", () => {
     const state = fold([...setup, modifierDealt("alice", 4)]);
