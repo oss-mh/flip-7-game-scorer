@@ -64,6 +64,10 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
 
   const playerRound = requireActivePlayerRound(round, event.playerId);
 
+  // A duplicate or a seventh unique number aborts a Flip Three in progress
+  // instead of merely counting toward it — see #61.
+  let abortsForcedDraw = false;
+
   let updatedRound: RoundState;
   switch (event.card.kind) {
     case "number": {
@@ -71,6 +75,7 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
       const isDuplicate = playerRound.numberCards.some((existing) => existing.value === card.value);
       const numberCards = [...playerRound.numberCards, card];
       const hasFlipped7 = !isDuplicate && numberCards.length === FLIP_7_HAND_SIZE;
+      abortsForcedDraw = isDuplicate || hasFlipped7;
 
       const updatedPlayerRound: PlayerRoundState = {
         ...playerRound,
@@ -157,6 +162,15 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
     }
   }
 
-  const finalRound = forcedDraw ? consumeForcedDraw(updatedRound, forcedDraw) : updatedRound;
+  let finalRound = updatedRound;
+  if (forcedDraw) {
+    // A bust or Flip 7 cancels whatever draws were still owed, discarding
+    // the whole queue rather than decrementing it — that also drops any
+    // nested action (a Freeze revealed mid-sequence, say) that was queued
+    // behind the forced draw and never got the chance to resolve (#61).
+    finalRound = abortsForcedDraw
+      ? { ...updatedRound, pendingResolutions: [] }
+      : consumeForcedDraw(updatedRound, forcedDraw);
+  }
   return withCurrentRound(state, finalRound);
 }

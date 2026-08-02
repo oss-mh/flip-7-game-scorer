@@ -320,7 +320,7 @@ describe("CardDealt — Flip Three", () => {
     expect(() => fold(events)).toThrow(DomainError);
   });
 
-  it("still busts the player on a duplicate drawn as part of the forced three", () => {
+  it("busts the player on a duplicate drawn mid-sequence and cancels the remaining draws", () => {
     const state = fold([
       ...setup,
       flipThreeDealt("alice"),
@@ -328,6 +328,52 @@ describe("CardDealt — Flip Three", () => {
       cardDealt("alice", 5, 2),
     ]);
     expect(state.currentRound?.players["alice"]?.status).toBe("busted");
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+
+  it("discards any nested action queued before a mid-sequence bust", () => {
+    const state = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      freezeDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+    ]);
+    expect(state.currentRound?.players["alice"]?.status).toBe("busted");
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+
+  it("allows dealing to other players again once a mid-sequence bust cancels the sequence", () => {
+    const state = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+      cardDealt("bob", 9),
+    ]);
+    expect(state.currentRound?.players["bob"]?.numberCards).toEqual([createNumberCard(9, 1)]);
+  });
+
+  it("ends the round immediately on Flip 7 mid-sequence and cancels the remaining draws", () => {
+    const events = [
+      ...setup,
+      cardDealt("bob", 9),
+      cardDealt("alice", 1),
+      cardDealt("alice", 2),
+      cardDealt("alice", 3),
+      cardDealt("alice", 4),
+      cardDealt("alice", 6),
+      cardDealt("alice", 8),
+      flipThreeDealt("alice"),
+      modifierDealt("alice", 4),
+      cardDealt("alice", 12),
+    ];
+    const state = fold(events);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.status).toBe("flipped7");
+    expect(alice?.numberCards).toHaveLength(7);
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+    expect(state.currentRound?.players["bob"]?.status).toBe("stayed");
   });
 });
 
