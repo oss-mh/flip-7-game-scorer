@@ -20,3 +20,12 @@ export {
   isNumberCard,
 } from "./cards.js";
 export { DECK_SIZE, createDeck } from "./deck.js";
+export type { Player, PlayerId } from "./player.js";
+export type {
+  GameState,
+  GameStatus,
+  PendingResolution,
+  PlayerRoundState,
+  PlayerRoundStatus,
+  RoundState,
+} from "./state.js";
