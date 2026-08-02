@@ -1,0 +1,8 @@
+node_modules
+.next
+dist
+coverage
+pnpm-lock.yaml
+
+# Prose, hand-formatted; not the code-formatting this config is for.
+*.md
