@@ -34,8 +34,25 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
 
       return withCurrentRound(state, updatedRound);
     }
-    case "modifier":
-      throw new DomainError("CardDealt for modifier cards is not implemented yet (lands in #51)");
+    case "modifier": {
+      const card = event.card;
+
+      // Modifiers can never bust a player — not even a second copy of the
+      // same modifier — and they don't count toward the seven unique
+      // numbers needed for Flip 7, since they live in their own row.
+      const updatedPlayerRound: PlayerRoundState = {
+        ...playerRound,
+        modifierCards: [...playerRound.modifierCards, card],
+      };
+
+      const updatedRound: RoundState = {
+        ...round,
+        players: { ...round.players, [event.playerId]: updatedPlayerRound },
+        cardsDealt: [...round.cardsDealt, card],
+      };
+
+      return withCurrentRound(state, updatedRound);
+    }
     case "action":
       throw new DomainError("CardDealt for action cards is not implemented yet (lands in M2)");
     default: {

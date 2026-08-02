@@ -34,6 +34,19 @@ function cardDealt(playerId: string, value: NumberValue, copyIndex = 1): GameEve
   return { ...envelope(), t: "CardDealt", playerId, card: createNumberCard(value, copyIndex) };
 }
 
+function modifierDealt(
+  playerId: string,
+  modifier: Parameters<typeof createModifierCard>[0],
+  copyIndex = 1,
+): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createModifierCard(modifier, copyIndex),
+  };
+}
+
 const setup = [gameCreated(), roundStarted("alice")];
 
 describe("CardDealt — number cards", () => {
@@ -83,17 +96,48 @@ describe("CardDealt — number cards", () => {
   });
 });
 
-describe("CardDealt — cards not yet handled", () => {
-  it("throws for modifier cards, which land in #51", () => {
-    const event: GameEvent = {
-      ...envelope(),
-      t: "CardDealt",
-      playerId: "alice",
-      card: createModifierCard(2, 1),
-    };
-    expect(() => fold([...setup, event])).toThrow(DomainError);
+describe("CardDealt — modifier cards", () => {
+  it("appends to a separate row from number cards", () => {
+    const state = fold([...setup, modifierDealt("alice", 4)]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.modifierCards).toEqual([createModifierCard(4, 1)]);
+    expect(alice?.numberCards).toEqual([]);
   });
 
+  it("records the card in the round's cardsDealt log", () => {
+    const state = fold([...setup, modifierDealt("alice", 4)]);
+    expect(state.currentRound?.cardsDealt).toEqual([createModifierCard(4, 1)]);
+  });
+
+  it("never busts the player, even on a second copy of the same modifier", () => {
+    const state = fold([...setup, modifierDealt("alice", "x2"), modifierDealt("alice", "x2", 2)]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.status).toBe("active");
+    expect(alice?.modifierCards).toEqual([
+      createModifierCard("x2", 1),
+      createModifierCard("x2", 2),
+    ]);
+  });
+
+  it("doesn't touch the number row or count toward Flip 7", () => {
+    const state = fold([...setup, cardDealt("alice", 5), modifierDealt("alice", 2)]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.numberCards).toEqual([createNumberCard(5, 1)]);
+    expect(alice?.modifierCards).toEqual([createModifierCard(2, 1)]);
+  });
+
+  it("rejects dealing to a non-active player", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+      modifierDealt("alice", 2),
+    ];
+    expect(() => fold(events)).toThrow(DomainError);
+  });
+});
+
+describe("CardDealt — cards not yet handled", () => {
   it("throws for action cards, which land in M2", () => {
     const event: GameEvent = {
       ...envelope(),
