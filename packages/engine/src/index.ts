@@ -36,15 +36,18 @@ export { EVENT_SCHEMA_VERSION } from "./events.js";
 export type { Player, PlayerId } from "./player.js";
 export { fold, initialState, reduce } from "./reduce.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
-export { isRoundOver, legalActions } from "./selectors.js";
+export { isRoundOver, legalActions, nextResolution } from "./selectors.js";
 export type { ScoreBreakdown } from "./scoring.js";
 export { scoreRound } from "./scoring.js";
 export type {
+  AwaitingTargetResolution,
+  ForcedDrawRemainingResolution,
   GameState,
   GameStatus,
   PendingResolution,
   PlayerRoundState,
   PlayerRoundStatus,
   RoundState,
+  SecondChanceReassignmentResolution,
 } from "./state.js";
 export { DEFAULT_TARGET_SCORE } from "./state.js";

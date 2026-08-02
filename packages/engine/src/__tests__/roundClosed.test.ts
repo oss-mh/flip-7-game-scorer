@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createNumberCard } from "../cards.js";
+import { createActionCard, createNumberCard } from "../cards.js";
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type GameEvent } from "../events.js";
 import { fold } from "../reduce.js";
@@ -37,6 +37,15 @@ function cardDealt(
   copyIndex = 1,
 ): GameEvent {
   return { ...envelope(), t: "CardDealt", playerId, card: createNumberCard(value, copyIndex) };
+}
+
+function secondChanceDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("secondChance", copyIndex),
+  };
 }
 
 function playerStayed(playerId: string): GameEvent {
@@ -123,5 +132,48 @@ describe("RoundClosed", () => {
 
   it("rejects closing before any round has started", () => {
     expect(() => fold([gameCreated(), roundClosed()])).toThrow(DomainError);
+  });
+
+  it("discards an unused held Second Chance at RoundClosed (#19)", () => {
+    const events = [
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      cardDealt("bob", 3, 2),
+      roundClosed(),
+    ];
+    const state = fold(events);
+    expect(state.currentRound?.players["alice"]?.heldSecondChance).toBeNull();
+  });
+
+  it("does not disturb scoring — an unused Second Chance carries no bonus", () => {
+    const events = [
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      cardDealt("bob", 3, 2),
+      roundClosed(),
+    ];
+    const state = fold(events);
+    expect(state.cumulativeScores).toEqual({ alice: 5, bob: 0 });
+  });
+
+  it("never lets a held Second Chance carry into the next round (#19)", () => {
+    const events = [
+      ...setup,
+      secondChanceDealt("alice"),
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      roundClosed(),
+      roundStarted("bob"),
+    ];
+    const state = fold(events);
+    expect(state.currentRound?.players["alice"]?.heldSecondChance).toBeNull();
   });
 });

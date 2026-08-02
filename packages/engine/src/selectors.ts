@@ -1,5 +1,5 @@
 import type { PlayerId } from "./player.js";
-import type { GameState } from "./state.js";
+import type { GameState, PendingResolution } from "./state.js";
 
 /**
  * True once every player in the current round has stopped acting — busted,
@@ -12,6 +12,22 @@ export function isRoundOver(state: GameState): boolean {
     return false;
   }
   return Object.values(round.players).every((playerRound) => playerRound.status !== "active");
+}
+
+/**
+ * The one resolution item the table needs to act on right now, or `null` if
+ * nothing is pending. The queue can hold several items (a Freeze revealed
+ * mid-Flip-Three nests behind the draw it interrupted), but only the front
+ * is actionable — everything else is waiting its turn. The UI drives its
+ * "what does the table need to do next" prompt from this selector rather
+ * than reading `pendingResolutions` directly.
+ */
+export function nextResolution(state: GameState): PendingResolution | null {
+  const round = state.currentRound;
+  if (!round || round.pendingResolutions.length === 0) {
+    return null;
+  }
+  return round.pendingResolutions[0] ?? null;
 }
 
 export type LegalMove = "hit" | "stay";
@@ -35,9 +51,9 @@ const NO_LEGAL_ACTIONS: LegalActionsResult = {
 /**
  * What a player may currently do. The UI renders this rather than
  * re-deriving legality itself — see AGENTS.md, "Rules live in the engine,
- * never in components". `mustResolvePendingAction`/`awaitingTargetSelection`
- * are wired up for M2's action-card resolution queue; both are always false
- * in M1 since nothing populates `pendingResolutions` yet.
+ * never in components". No move is legal for anyone while a resolution is
+ * pending; `awaitingTargetSelection` flags only the player the *front* of
+ * the queue is waiting on, per `nextResolution`.
  */
 export function legalActions(state: GameState, playerId: PlayerId): LegalActionsResult {
   const round = state.currentRound;
@@ -50,10 +66,10 @@ export function legalActions(state: GameState, playerId: PlayerId): LegalActions
     return NO_LEGAL_ACTIONS;
   }
 
-  const mustResolvePendingAction = round.pendingResolutions.length > 0;
-  const awaitingTargetSelection = round.pendingResolutions.some(
-    (resolution) => resolution.sourcePlayerId === playerId,
-  );
+  const pending = nextResolution(state);
+  const mustResolvePendingAction = pending !== null;
+  const awaitingTargetSelection =
+    pending?.kind === "awaiting-target" && pending.sourcePlayerId === playerId;
 
   if (playerRound.status !== "active") {
     return { moves: [], reasons: {}, mustResolvePendingAction, awaitingTargetSelection };

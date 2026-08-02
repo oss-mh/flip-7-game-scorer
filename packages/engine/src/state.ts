@@ -16,15 +16,46 @@ export interface PlayerRoundState {
 }
 
 /**
- * An action card that has been revealed but not yet resolved — e.g. a
- * Freeze awaiting a target, or a Second Chance duplicate awaiting
- * reassignment. The concrete resolution flow for each action kind lands in
- * M2; this type exists now so `RoundState`'s shape is stable.
+ * A revealed action card (Freeze or a Second Chance duplicate) waiting on
+ * the source player to choose who it applies to.
  */
-export interface PendingResolution {
+export interface AwaitingTargetResolution {
+  readonly kind: "awaiting-target";
   readonly card: ActionCard;
   readonly sourcePlayerId: PlayerId;
 }
+
+/**
+ * A Flip Three in progress: `cardsRemaining` counts the forced draws still
+ * owed to `playerId` before the sequence completes. No player decision is
+ * needed to resolve this item — the table just keeps dealing.
+ */
+export interface ForcedDrawRemainingResolution {
+  readonly kind: "forced-draw-remaining";
+  readonly playerId: PlayerId;
+  readonly cardsRemaining: number;
+}
+
+/**
+ * A duplicate Second Chance drawn by a player who already holds one, waiting
+ * to be passed to another active player without one (or discarded if no one
+ * qualifies — see AGENTS.md's Second Chance rule).
+ */
+export interface SecondChanceReassignmentResolution {
+  readonly kind: "second-chance-reassignment";
+  readonly card: ActionCard;
+  readonly fromPlayerId: PlayerId;
+}
+
+/**
+ * An item on the round's resolution queue — action cards interrupt normal
+ * dealing and sometimes nest (a Freeze revealed mid-Flip-Three, say), so
+ * they're queued here instead of resolved inline. Only the front of the
+ * queue (see `nextResolution`) is actionable; anything behind it is waiting
+ * its turn.
+ */
+export type PendingResolution =
+  AwaitingTargetResolution | ForcedDrawRemainingResolution | SecondChanceReassignmentResolution;
 
 export interface RoundState {
   readonly roundNumber: number;

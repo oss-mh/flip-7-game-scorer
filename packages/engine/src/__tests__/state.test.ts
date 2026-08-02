@@ -18,6 +18,7 @@ function buildSampleRoundState(): RoundState {
   const alice = buildSamplePlayerRoundState("alice");
   const bob = buildSamplePlayerRoundState("bob");
   const pending: PendingResolution = {
+    kind: "awaiting-target",
     card: createActionCard("freeze", 1),
     sourcePlayerId: "alice",
   };
@@ -52,7 +53,30 @@ describe("domain state shapes", () => {
     expect(game.status).toBe("active");
     expect(game.currentRound?.dealerId).toBe("alice");
     expect(game.currentRound?.players["alice"]?.status).toBe("active");
-    expect(game.currentRound?.pendingResolutions[0]?.card.kind).toBe("action");
+
+    const pending = game.currentRound?.pendingResolutions[0];
+    if (pending?.kind !== "awaiting-target") {
+      throw new Error("expected an awaiting-target resolution");
+    }
+    expect(pending.card.kind).toBe("action");
+  });
+
+  it("accepts every PendingResolution kind on the queue", () => {
+    const resolutions: PendingResolution[] = [
+      { kind: "awaiting-target", card: createActionCard("freeze", 1), sourcePlayerId: "alice" },
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 2 },
+      {
+        kind: "second-chance-reassignment",
+        card: createActionCard("secondChance", 1),
+        fromPlayerId: "bob",
+      },
+    ];
+
+    expect(resolutions.map((resolution) => resolution.kind)).toEqual([
+      "awaiting-target",
+      "forced-draw-remaining",
+      "second-chance-reassignment",
+    ]);
   });
 
   it("allows currentRound to be null between rounds", () => {

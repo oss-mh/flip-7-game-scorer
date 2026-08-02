@@ -5,7 +5,7 @@ import { isRoundOver } from "../selectors.js";
 import { requireCurrentRound } from "./roundHelpers.js";
 
 import type { PlayerId } from "../player.js";
-import type { GameState } from "../state.js";
+import type { GameState, PlayerRoundState } from "../state.js";
 
 /**
  * Validates the round has genuinely ended, then banks each player's round
@@ -25,5 +25,20 @@ export function applyRoundClosed(state: GameState): GameState {
     cumulativeScores[playerId] = (cumulativeScores[playerId] ?? 0) + total;
   }
 
-  return { ...state, cumulativeScores };
+  // Every held Second Chance discards at round end, used or not — see #19.
+  // RoundStarted already hands out a fresh heldSecondChance: null next
+  // round regardless, so this is about the closed round's own state being
+  // correct in the gap before that, not about preventing carry-over.
+  const players: Record<PlayerId, PlayerRoundState> = {};
+  for (const [playerId, playerRoundState] of Object.entries(round.players)) {
+    players[playerId] = playerRoundState.heldSecondChance
+      ? { ...playerRoundState, heldSecondChance: null }
+      : playerRoundState;
+  }
+
+  return {
+    ...state,
+    cumulativeScores,
+    currentRound: { ...round, players },
+  };
 }

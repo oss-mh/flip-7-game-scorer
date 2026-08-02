@@ -14,6 +14,7 @@ const baseEnvelope = {
 // DomainError naming the issue that implements it. GameCreated, RoundStarted,
 // CardDealt, PlayerStayed and RoundClosed are excluded: their handlers
 // landed in #14, #15, #16, #52 and #54, so they're tested separately below.
+// DeckReshuffled's handler landed in #65 — see deckReshuffled.test.ts.
 const notYetImplementedEvents: readonly GameEvent[] = [
   {
     ...baseEnvelope,
@@ -22,7 +23,6 @@ const notYetImplementedEvents: readonly GameEvent[] = [
     sourceId: "alice",
     targetId: "alice",
   },
-  { ...baseEnvelope, t: "DeckReshuffled" },
   { ...baseEnvelope, t: "ManualScoreEntered", playerId: "alice", points: 10 },
 ];
 

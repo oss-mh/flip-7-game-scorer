@@ -4,9 +4,15 @@ import { requireActivePlayerRound, requireCurrentRound, withCurrentRound } from 
 
 import type { CardDealtEvent } from "../events.js";
 import type { PlayerId } from "../player.js";
-import type { GameState, PlayerRoundState, RoundState } from "../state.js";
+import type {
+  ForcedDrawRemainingResolution,
+  GameState,
+  PlayerRoundState,
+  RoundState,
+} from "../state.js";
 
 const FLIP_7_HAND_SIZE = 7;
+const FLIP_THREE_DRAW_COUNT = 3;
 
 /**
  * Flip 7 ends the round immediately for everyone. The player who flipped it
@@ -27,16 +33,74 @@ function bankOtherActivePlayers(
   return updated;
 }
 
+/**
+ * The card that was just dealt fills one of the three slots a Flip Three
+ * owes `pending.playerId` — decrement it, dropping it off the front of the
+ * queue once all three have landed. Anything the dealt card itself queued
+ * (a nested Freeze or Flip Three — #62) was appended behind it and is left
+ * untouched.
+ */
+function consumeForcedDraw(round: RoundState, pending: ForcedDrawRemainingResolution): RoundState {
+  const cardsRemaining = pending.cardsRemaining - 1;
+  const rest = round.pendingResolutions.slice(1);
+  const pendingResolutions = cardsRemaining > 0 ? [{ ...pending, cardsRemaining }, ...rest] : rest;
+  return { ...round, pendingResolutions };
+}
+
+/** Whether some other active player could still legally receive a passed Second Chance — see #18. */
+function hasEligibleSecondChanceRecipient(round: RoundState, sourcePlayerId: PlayerId): boolean {
+  return Object.values(round.players).some(
+    (playerRound) =>
+      playerRound.playerId !== sourcePlayerId &&
+      playerRound.status === "active" &&
+      playerRound.heldSecondChance === null,
+  );
+}
+
 export function applyCardDealt(state: GameState, event: CardDealtEvent): GameState {
   const round = requireCurrentRound(state);
+
+  const pending = round.pendingResolutions[0];
+  let forcedDraw: ForcedDrawRemainingResolution | null = null;
+  if (pending) {
+    if (pending.kind === "forced-draw-remaining" && pending.playerId === event.playerId) {
+      forcedDraw = pending;
+    } else {
+      throw new DomainError(
+        `Cannot deal to "${event.playerId}" while a pending resolution is unresolved`,
+      );
+    }
+  }
+
   const playerRound = requireActivePlayerRound(round, event.playerId);
 
+  // A duplicate or a seventh unique number aborts a Flip Three in progress
+  // instead of merely counting toward it — see #61.
+  let abortsForcedDraw = false;
+
+  let updatedRound: RoundState;
   switch (event.card.kind) {
     case "number": {
       const card = event.card;
       const isDuplicate = playerRound.numberCards.some((existing) => existing.value === card.value);
+
+      if (isDuplicate && playerRound.heldSecondChance) {
+        // Second Chance intercepts the bust: both cards are discarded (the
+        // duplicate never joins numberCards), the player's existing hand is
+        // untouched, and they stay active — see #63. Not a bust, so a Flip
+        // Three in progress isn't aborted by this card either.
+        const updatedPlayerRound: PlayerRoundState = { ...playerRound, heldSecondChance: null };
+        updatedRound = {
+          ...round,
+          players: { ...round.players, [event.playerId]: updatedPlayerRound },
+          cardsDealt: [...round.cardsDealt, card],
+        };
+        break;
+      }
+
       const numberCards = [...playerRound.numberCards, card];
       const hasFlipped7 = !isDuplicate && numberCards.length === FLIP_7_HAND_SIZE;
+      abortsForcedDraw = isDuplicate || hasFlipped7;
 
       const updatedPlayerRound: PlayerRoundState = {
         ...playerRound,
@@ -51,13 +115,12 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
           )
         : { ...round.players, [event.playerId]: updatedPlayerRound };
 
-      const updatedRound: RoundState = {
+      updatedRound = {
         ...round,
         players,
         cardsDealt: [...round.cardsDealt, card],
       };
-
-      return withCurrentRound(state, updatedRound);
+      break;
     }
     case "modifier": {
       const card = event.card;
@@ -70,19 +133,92 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
         modifierCards: [...playerRound.modifierCards, card],
       };
 
-      const updatedRound: RoundState = {
+      updatedRound = {
         ...round,
         players: { ...round.players, [event.playerId]: updatedPlayerRound },
         cardsDealt: [...round.cardsDealt, card],
       };
-
-      return withCurrentRound(state, updatedRound);
+      break;
     }
-    case "action":
-      throw new DomainError("CardDealt for action cards is not implemented yet (lands in M2)");
+    case "action": {
+      const card = event.card;
+      switch (card.action) {
+        // Neither Freeze nor Flip Three joins a card row — action cards
+        // aren't held, they interrupt — so each only needs recording in
+        // the deck log and queuing its own resolution.
+        case "freeze":
+          updatedRound = {
+            ...round,
+            cardsDealt: [...round.cardsDealt, card],
+            pendingResolutions: [
+              ...round.pendingResolutions,
+              { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
+            ],
+          };
+          break;
+        case "flipThree":
+          updatedRound = {
+            ...round,
+            cardsDealt: [...round.cardsDealt, card],
+            pendingResolutions: [
+              ...round.pendingResolutions,
+              {
+                kind: "forced-draw-remaining",
+                playerId: event.playerId,
+                cardsRemaining: FLIP_THREE_DRAW_COUNT,
+              },
+            ],
+          };
+          break;
+        case "secondChance": {
+          // Holding your first one doesn't need a resolution queued —
+          // there's no target to pick — so it just sits on the player's
+          // own state. A second, duplicate one needs to be passed to
+          // another eligible player (#17) — or, if nobody qualifies,
+          // discarded automatically with no prompt at all (#18).
+          if (playerRound.heldSecondChance) {
+            updatedRound = {
+              ...round,
+              cardsDealt: [...round.cardsDealt, card],
+              pendingResolutions: hasEligibleSecondChanceRecipient(round, event.playerId)
+                ? [
+                    ...round.pendingResolutions,
+                    { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
+                  ]
+                : round.pendingResolutions,
+            };
+            break;
+          }
+          const updatedPlayerRound: PlayerRoundState = { ...playerRound, heldSecondChance: card };
+          updatedRound = {
+            ...round,
+            players: { ...round.players, [event.playerId]: updatedPlayerRound },
+            cardsDealt: [...round.cardsDealt, card],
+          };
+          break;
+        }
+        default: {
+          const exhaustive: never = card.action;
+          throw new DomainError(`Unknown action type: ${JSON.stringify(exhaustive)}`);
+        }
+      }
+      break;
+    }
     default: {
       const exhaustive: never = event.card;
       throw new DomainError(`Unknown card kind: ${JSON.stringify(exhaustive)}`);
     }
   }
+
+  let finalRound = updatedRound;
+  if (forcedDraw) {
+    // A bust or Flip 7 cancels whatever draws were still owed, discarding
+    // the whole queue rather than decrementing it — that also drops any
+    // nested action (a Freeze revealed mid-sequence, say) that was queued
+    // behind the forced draw and never got the chance to resolve (#61).
+    finalRound = abortsForcedDraw
+      ? { ...updatedRound, pendingResolutions: [] }
+      : consumeForcedDraw(updatedRound, forcedDraw);
+  }
+  return withCurrentRound(state, finalRound);
 }

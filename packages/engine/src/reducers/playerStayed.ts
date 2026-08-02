@@ -13,6 +13,14 @@ import type { GameState, PlayerRoundState, RoundState } from "../state.js";
  */
 export function applyPlayerStayed(state: GameState, event: PlayerStayedEvent): GameState {
   const round = requireCurrentRound(state);
+
+  // A Flip Three in progress forces all three draws before anyone may act
+  // again — see #60 — and any other pending resolution blocks every move
+  // the same way (#58).
+  if (round.pendingResolutions.length > 0) {
+    throw new DomainError("Cannot stay while a pending resolution is unresolved");
+  }
+
   const playerRound = requireActivePlayerRound(round, event.playerId);
 
   if (playerRound.numberCards.length === 0 && playerRound.modifierCards.length === 0) {
