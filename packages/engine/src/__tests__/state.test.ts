@@ -2,12 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createActionCard, createNumberCard } from "../cards.js";
 
-import type {
-  GameState,
-  PendingResolution,
-  PlayerRoundState,
-  RoundState,
-} from "../state.js";
+import type { GameState, PendingResolution, PlayerRoundState, RoundState } from "../state.js";
 
 function buildSamplePlayerRoundState(playerId: string): PlayerRoundState {
   return {

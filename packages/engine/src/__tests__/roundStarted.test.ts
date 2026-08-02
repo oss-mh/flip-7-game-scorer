@@ -79,8 +79,8 @@ describe("RoundStarted", () => {
   });
 
   it("rejects a dealer that skips the rotation order", () => {
-    expect(() =>
-      fold([gameCreated(), roundStarted("alice"), roundStarted("cara")]),
-    ).toThrow(DomainError);
+    expect(() => fold([gameCreated(), roundStarted("alice"), roundStarted("cara")])).toThrow(
+      DomainError,
+    );
   });
 });

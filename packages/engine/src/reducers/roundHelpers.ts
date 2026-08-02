@@ -18,10 +18,7 @@ export function requirePlayerRound(round: RoundState, playerId: PlayerId): Playe
   return playerRound;
 }
 
-export function requireActivePlayerRound(
-  round: RoundState,
-  playerId: PlayerId,
-): PlayerRoundState {
+export function requireActivePlayerRound(round: RoundState, playerId: PlayerId): PlayerRoundState {
   const playerRound = requirePlayerRound(round, playerId);
   if (playerRound.status !== "active") {
     throw new DomainError(

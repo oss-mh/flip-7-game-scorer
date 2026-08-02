@@ -16,9 +16,7 @@ export function applyPlayerStayed(state: GameState, event: PlayerStayedEvent): G
   const playerRound = requireActivePlayerRound(round, event.playerId);
 
   if (playerRound.numberCards.length === 0 && playerRound.modifierCards.length === 0) {
-    throw new DomainError(
-      `Player "${event.playerId}" cannot stay with no cards in front of them`,
-    );
+    throw new DomainError(`Player "${event.playerId}" cannot stay with no cards in front of them`);
   }
 
   const updatedPlayerRound: PlayerRoundState = { ...playerRound, status: "stayed" };

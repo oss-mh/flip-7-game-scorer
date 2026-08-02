@@ -5,12 +5,7 @@ import type { Player, PlayerId } from "./player.js";
  * `flipped7` and `busted` are derived by the reducer from `CardDealt`, never
  * stored as their own events — see AGENTS.md §"Events record what happened".
  */
-export type PlayerRoundStatus =
-  | "active"
-  | "stayed"
-  | "busted"
-  | "frozen"
-  | "flipped7";
+export type PlayerRoundStatus = "active" | "stayed" | "busted" | "frozen" | "flipped7";
 
 export interface PlayerRoundState {
   readonly playerId: PlayerId;

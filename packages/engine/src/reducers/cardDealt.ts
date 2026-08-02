@@ -1,10 +1,6 @@
 import { DomainError } from "../errors.js";
 
-import {
-  requireActivePlayerRound,
-  requireCurrentRound,
-  withCurrentRound,
-} from "./roundHelpers.js";
+import { requireActivePlayerRound, requireCurrentRound, withCurrentRound } from "./roundHelpers.js";
 
 import type { CardDealtEvent } from "../events.js";
 import type { PlayerId } from "../player.js";
@@ -38,9 +34,7 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
   switch (event.card.kind) {
     case "number": {
       const card = event.card;
-      const isDuplicate = playerRound.numberCards.some(
-        (existing) => existing.value === card.value,
-      );
+      const isDuplicate = playerRound.numberCards.some((existing) => existing.value === card.value);
       const numberCards = [...playerRound.numberCards, card];
       const hasFlipped7 = !isDuplicate && numberCards.length === FLIP_7_HAND_SIZE;
 

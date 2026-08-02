@@ -42,7 +42,11 @@ const setup = [gameCreated(), roundStarted("alice")];
 
 describe("PlayerStayed", () => {
   it("moves an active player with at least one card to stayed", () => {
-    const state = fold([...setup, cardDealt("alice", createNumberCard(5, 1)), playerStayed("alice")]);
+    const state = fold([
+      ...setup,
+      cardDealt("alice", createNumberCard(5, 1)),
+      playerStayed("alice"),
+    ]);
     expect(state.currentRound?.players["alice"]?.status).toBe("stayed");
   });
 

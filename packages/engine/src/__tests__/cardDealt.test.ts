@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { type NumberValue, createActionCard, createModifierCard, createNumberCard } from "../cards.js";
+import {
+  type NumberValue,
+  createActionCard,
+  createModifierCard,
+  createNumberCard,
+} from "../cards.js";
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type GameEvent } from "../events.js";
 import { fold } from "../reduce.js";
@@ -78,12 +83,22 @@ describe("CardDealt — number cards", () => {
   });
 
   it("rejects further cards once a player has busted", () => {
-    const events = [...setup, cardDealt("alice", 5), cardDealt("alice", 5, 2), cardDealt("alice", 9)];
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+      cardDealt("alice", 9),
+    ];
     expect(() => fold(events)).toThrow(DomainError);
   });
 
   it("does not bust other players when one player busts", () => {
-    const state = fold([...setup, cardDealt("alice", 5), cardDealt("alice", 5, 2), cardDealt("bob", 5)]);
+    const state = fold([
+      ...setup,
+      cardDealt("alice", 5),
+      cardDealt("alice", 5, 2),
+      cardDealt("bob", 5),
+    ]);
     expect(state.currentRound?.players["bob"]?.status).toBe("active");
   });
 
@@ -126,10 +141,7 @@ describe("CardDealt — Flip 7", () => {
   });
 
   it("ends the round immediately: other active players bank what they have", () => {
-    const events = [
-      cardDealt("bob", 9),
-      ...dealSevenUniqueTo("alice"),
-    ];
+    const events = [cardDealt("bob", 9), ...dealSevenUniqueTo("alice")];
     const state = fold([...setup, ...events]);
     expect(state.currentRound?.players["bob"]?.status).toBe("stayed");
     expect(state.currentRound?.players["bob"]?.numberCards).toEqual([createNumberCard(9, 1)]);
