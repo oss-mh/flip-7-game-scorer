@@ -2,6 +2,7 @@ import { DomainError } from "./errors.js";
 import { applyCardDealt } from "./reducers/cardDealt.js";
 import { applyGameCreated } from "./reducers/gameCreated.js";
 import { applyPlayerStayed } from "./reducers/playerStayed.js";
+import { applyRoundClosed } from "./reducers/roundClosed.js";
 import { applyRoundStarted } from "./reducers/roundStarted.js";
 
 import type { GameEvent } from "./events.js";
@@ -52,7 +53,7 @@ export function reduce(state: GameState, event: GameEvent): GameState {
     case "ManualScoreEntered":
       return notImplemented(event, "M6");
     case "RoundClosed":
-      return notImplemented(event, "#54");
+      return applyRoundClosed(state);
     default: {
       const exhaustive: never = event;
       throw new DomainError(`Unknown event type: ${JSON.stringify(exhaustive)}`);
