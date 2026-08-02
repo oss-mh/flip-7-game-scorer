@@ -2,25 +2,27 @@
   "name": "flip-7-game-scorer",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "engines": {
+    "node": ">=22.20.0"
   },
-  "dependencies": {
-    "next": "16.2.12",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
+  "scripts": {
+    "dev": "pnpm --parallel -r --if-present run dev",
+    "build": "pnpm -r --if-present run build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "test:watch": "pnpm -r --if-present run test:watch",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^9.39.5",
     "eslint-config-next": "16.2.12",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.17.1",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
   }
 }

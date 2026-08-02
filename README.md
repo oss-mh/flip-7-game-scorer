@@ -129,7 +129,7 @@ Both are enforced by lint and fail CI. Break either and the "swap the storage la
 
 ## Getting started
 
-**Requires** Node 20+ and pnpm 9+.
+**Requires** Node 22.20+ (see `.nvmrc`) and pnpm (version pinned via `packageManager` in `package.json`; run `corepack enable` to get it automatically).
 
 ```bash
 pnpm install
@@ -144,6 +144,14 @@ pnpm dev          # http://localhost:3000
 | `pnpm test:watch` | Vitest in watch mode                        |
 | `pnpm lint`       | ESLint, including the import-boundary rules |
 | `pnpm typecheck`  | `tsc --noEmit` across workspaces            |
+
+---
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request: install (pnpm-cached), lint, typecheck, test (with coverage — see [`packages/engine/vitest.config.ts`](./packages/engine/vitest.config.ts) for the threshold), then build. A coverage summary is posted to the job's step summary.
+
+**Branch protection.** `main` should have a protection rule requiring the `Lint, typecheck, test, build` check from this workflow to pass before merging (Settings → Branches → Add rule → Require status checks to pass, select that check; also enable "Require branches to be up to date"). This isn't configured automatically — an admin needs to turn it on once in the repo settings.
 
 ---
 
