@@ -1,5 +1,6 @@
 import { DomainError } from "./errors.js";
 import { applyGameCreated } from "./reducers/gameCreated.js";
+import { applyRoundStarted } from "./reducers/roundStarted.js";
 
 import type { GameEvent } from "./events.js";
 import type { GameState } from "./state.js";
@@ -37,7 +38,7 @@ export function reduce(state: GameState, event: GameEvent): GameState {
     case "GameCreated":
       return applyGameCreated(event);
     case "RoundStarted":
-      return notImplemented(event, "#15");
+      return applyRoundStarted(state, event);
     case "CardDealt":
       return notImplemented(event, "#16 / #51");
     case "PlayerStayed":
