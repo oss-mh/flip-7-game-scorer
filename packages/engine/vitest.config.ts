@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
       thresholds: {
         lines: 80,
         statements: 80,
