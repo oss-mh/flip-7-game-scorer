@@ -84,6 +84,38 @@ describe("RoundClosed", () => {
     expect(() => fold(events)).not.toThrow();
   });
 
+  it("banks each player's round score into cumulativeScores", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      cardDealt("bob", 3, 2), // bob busts, scores 0
+      roundClosed(),
+    ];
+    const state = fold(events);
+    expect(state.cumulativeScores).toEqual({ alice: 5, bob: 0 });
+  });
+
+  it("accumulates scores across multiple rounds", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      roundClosed(),
+      roundStarted("bob"),
+      cardDealt("alice", 4),
+      playerStayed("alice"),
+      cardDealt("bob", 2),
+      playerStayed("bob"),
+      roundClosed(),
+    ];
+    const state = fold(events);
+    expect(state.cumulativeScores).toEqual({ alice: 9, bob: 5 });
+  });
+
   it("rejects closing while a player is still active", () => {
     const events = [...setup, cardDealt("alice", 5), roundClosed()];
     expect(() => fold(events)).toThrow(DomainError);
