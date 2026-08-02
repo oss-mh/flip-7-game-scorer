@@ -509,6 +509,47 @@ describe("CardDealt — Second Chance", () => {
       createActionCard("secondChance", 2),
     ]);
   });
+
+  it("discards a duplicate automatically when no other player is active (#18)", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("alice", 1),
+      cardDealt("bob", 5),
+      cardDealt("bob", 5, 2), // bob busts, no longer active
+      secondChanceDealt("alice", 2),
+    ]);
+    expect(state.currentRound?.players["alice"]?.heldSecondChance).toEqual(
+      createActionCard("secondChance", 1),
+    );
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+
+  it("discards a duplicate automatically when every other active player already holds one (#18)", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("bob", 1),
+      secondChanceDealt("alice", 2),
+      secondChanceDealt("alice", 3),
+    ]);
+    expect(state.currentRound?.players["alice"]?.heldSecondChance).toEqual(
+      createActionCard("secondChance", 2),
+    );
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+
+  it("still records an auto-discarded duplicate in the round's cardsDealt log", () => {
+    const state = fold([
+      ...setup,
+      secondChanceDealt("bob", 1),
+      secondChanceDealt("alice", 2),
+      secondChanceDealt("alice", 3),
+    ]);
+    expect(state.currentRound?.cardsDealt).toEqual([
+      createActionCard("secondChance", 1),
+      createActionCard("secondChance", 2),
+      createActionCard("secondChance", 3),
+    ]);
+  });
 });
 
 describe("CardDealt — cards not yet handled", () => {

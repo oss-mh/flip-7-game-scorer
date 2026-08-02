@@ -47,6 +47,16 @@ function consumeForcedDraw(round: RoundState, pending: ForcedDrawRemainingResolu
   return { ...round, pendingResolutions };
 }
 
+/** Whether some other active player could still legally receive a passed Second Chance — see #18. */
+function hasEligibleSecondChanceRecipient(round: RoundState, sourcePlayerId: PlayerId): boolean {
+  return Object.values(round.players).some(
+    (playerRound) =>
+      playerRound.playerId !== sourcePlayerId &&
+      playerRound.status === "active" &&
+      playerRound.heldSecondChance === null,
+  );
+}
+
 export function applyCardDealt(state: GameState, event: CardDealtEvent): GameState {
   const round = requireCurrentRound(state);
 
@@ -164,15 +174,18 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
           // Holding your first one doesn't need a resolution queued —
           // there's no target to pick — so it just sits on the player's
           // own state. A second, duplicate one needs to be passed to
-          // another eligible player, which does need a target (#17).
+          // another eligible player (#17) — or, if nobody qualifies,
+          // discarded automatically with no prompt at all (#18).
           if (playerRound.heldSecondChance) {
             updatedRound = {
               ...round,
               cardsDealt: [...round.cardsDealt, card],
-              pendingResolutions: [
-                ...round.pendingResolutions,
-                { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
-              ],
+              pendingResolutions: hasEligibleSecondChanceRecipient(round, event.playerId)
+                ? [
+                    ...round.pendingResolutions,
+                    { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
+                  ]
+                : round.pendingResolutions,
             };
             break;
           }
