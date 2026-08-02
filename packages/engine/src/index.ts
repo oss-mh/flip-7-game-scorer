@@ -20,6 +20,7 @@ export {
   isNumberCard,
 } from "./cards.js";
 export { DECK_SIZE, createDeck } from "./deck.js";
+export { DomainError } from "./errors.js";
 export type {
   ActionTargetedEvent,
   CardDealtEvent,
@@ -33,6 +34,7 @@ export type {
 } from "./events.js";
 export { EVENT_SCHEMA_VERSION } from "./events.js";
 export type { Player, PlayerId } from "./player.js";
+export { fold, initialState, reduce } from "./reduce.js";
 export type {
   GameState,
   GameStatus,
