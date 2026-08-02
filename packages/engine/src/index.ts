@@ -19,3 +19,4 @@ export {
   isModifierCard,
   isNumberCard,
 } from "./cards.js";
+export { DECK_SIZE, createDeck } from "./deck.js";
