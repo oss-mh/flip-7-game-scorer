@@ -288,6 +288,32 @@ describe("CardDealt — Flip Three", () => {
     ]);
   });
 
+  it("counts a nested Flip Three toward the three and queues its own forced draw behind it, unresolved (#62)", () => {
+    const state = fold([...setup, flipThreeDealt("alice", 1), flipThreeDealt("alice", 2)]);
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 2 },
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 3 },
+    ]);
+  });
+
+  it("chains a nested Flip Three into a fresh three-card sequence once the outer three land (#62)", () => {
+    const chained = [
+      ...setup,
+      flipThreeDealt("alice", 1),
+      flipThreeDealt("alice", 2),
+      cardDealt("alice", 1),
+      cardDealt("alice", 2),
+    ];
+    const state = fold(chained);
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      { kind: "forced-draw-remaining", playerId: "alice", cardsRemaining: 3 },
+    ]);
+
+    // The nested sequence is still in progress, so the outer gate (#60)
+    // still refuses to deal to anyone else.
+    expect(() => fold([...chained, cardDealt("bob", 5)])).toThrow(DomainError);
+  });
+
   it("clears the resolution once all three cards have landed", () => {
     const state = fold([
       ...setup,

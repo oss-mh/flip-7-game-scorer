@@ -35,8 +35,12 @@ function roundStarted(dealerId: string): GameEvent {
   return { ...envelope(), t: "RoundStarted", dealerId };
 }
 
-function cardDealt(playerId: string, value: Parameters<typeof createNumberCard>[0]): GameEvent {
-  return { ...envelope(), t: "CardDealt", playerId, card: createNumberCard(value, 1) };
+function cardDealt(
+  playerId: string,
+  value: Parameters<typeof createNumberCard>[0],
+  copyIndex = 1,
+): GameEvent {
+  return { ...envelope(), t: "CardDealt", playerId, card: createNumberCard(value, copyIndex) };
 }
 
 function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
@@ -212,8 +216,39 @@ describe("ActionTargeted — Freeze", () => {
     ]);
   });
 
-  // Flip Three (forced-draw-remaining) isn't implemented yet, so a queue
-  // whose front item isn't an awaiting-target has to be hand-built.
+  it("discards a nested Freeze on bust, so it can no longer be resolved (#62)", () => {
+    const dealt = fold([
+      ...setup,
+      flipThreeDealt("alice"),
+      freezeDealt("alice"),
+      cardDealt("alice", 9),
+      cardDealt("alice", 9, 2), // duplicate — busts, discarding the whole queue (#61)
+    ]);
+    expect(dealt.currentRound?.pendingResolutions).toEqual([]);
+    expect(() => reduce(dealt, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
+  });
+
+  it("chains Flip Three revealing a Flip Three revealing a Freeze, resolved once both sequences complete (#62)", () => {
+    const dealt = fold([
+      ...setup,
+      flipThreeDealt("alice", 1), // outer: forces 3
+      flipThreeDealt("alice", 2), // outer draw 1/3 — nests an inner forced-draw-remaining
+      cardDealt("alice", 1), // outer draw 2/3
+      cardDealt("alice", 2), // outer draw 3/3 — outer clears, inner becomes the front
+      freezeDealt("alice", 1), // inner draw 1/3 — nests an awaiting-target behind the inner draw
+      cardDealt("alice", 4), // inner draw 2/3
+      cardDealt("alice", 6), // inner draw 3/3 — inner clears, the Freeze is finally the front
+    ]);
+
+    expect(dealt.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: FREEZE, sourcePlayerId: "alice" },
+    ]);
+
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "bob"));
+    expect(next.currentRound?.pendingResolutions).toEqual([]);
+    expect(next.currentRound?.players["bob"]?.status).toBe("frozen");
+  });
+
   it("rejects resolving a target when the front of the queue isn't awaiting one", () => {
     const base = fold(setup);
     const round = base.currentRound;
