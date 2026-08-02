@@ -1,4 +1,5 @@
 import { DomainError } from "./errors.js";
+import { applyActionTargeted } from "./reducers/actionTargeted.js";
 import { applyCardDealt } from "./reducers/cardDealt.js";
 import { applyGameCreated } from "./reducers/gameCreated.js";
 import { applyPlayerStayed } from "./reducers/playerStayed.js";
@@ -47,7 +48,7 @@ export function reduce(state: GameState, event: GameEvent): GameState {
     case "PlayerStayed":
       return applyPlayerStayed(state, event);
     case "ActionTargeted":
-      return notImplemented(event, "M2");
+      return applyActionTargeted(state, event);
     case "DeckReshuffled":
       return notImplemented(event, "M2");
     case "ManualScoreEntered":
