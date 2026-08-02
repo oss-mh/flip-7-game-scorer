@@ -78,8 +78,34 @@ export function applyCardDealt(state: GameState, event: CardDealtEvent): GameSta
 
       return withCurrentRound(state, updatedRound);
     }
-    case "action":
-      throw new DomainError("CardDealt for action cards is not implemented yet (lands in M2)");
+    case "action": {
+      const card = event.card;
+      switch (card.action) {
+        // A revealed Freeze doesn't join either card row — action cards
+        // aren't held, they interrupt — so it only needs recording in the
+        // deck log and queuing for the source player to pick a target (#20).
+        case "freeze": {
+          const updatedRound: RoundState = {
+            ...round,
+            cardsDealt: [...round.cardsDealt, card],
+            pendingResolutions: [
+              ...round.pendingResolutions,
+              { kind: "awaiting-target", card, sourcePlayerId: event.playerId },
+            ],
+          };
+          return withCurrentRound(state, updatedRound);
+        }
+        case "flipThree":
+        case "secondChance":
+          throw new DomainError(
+            `CardDealt for "${card.action}" action cards is not implemented yet (lands in M2)`,
+          );
+        default: {
+          const exhaustive: never = card.action;
+          throw new DomainError(`Unknown action type: ${JSON.stringify(exhaustive)}`);
+        }
+      }
+    }
     default: {
       const exhaustive: never = event.card;
       throw new DomainError(`Unknown card kind: ${JSON.stringify(exhaustive)}`);

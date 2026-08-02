@@ -4,6 +4,8 @@ import { createActionCard, createNumberCard } from "../cards.js";
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type ActionTargetedEvent, type GameEvent } from "../events.js";
 import { fold, reduce } from "../reduce.js";
+import { scoreRound } from "../scoring.js";
+import { isRoundOver } from "../selectors.js";
 
 import type { GameState } from "../state.js";
 
@@ -37,6 +39,14 @@ function cardDealt(playerId: string, value: Parameters<typeof createNumberCard>[
   return { ...envelope(), t: "CardDealt", playerId, card: createNumberCard(value, 1) };
 }
 
+function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
+}
+
+function playerStayed(playerId: string): GameEvent {
+  return { ...envelope(), t: "PlayerStayed", playerId };
+}
+
 function actionTargeted(
   card: ReturnType<typeof createActionCard>,
   sourceId: string,
@@ -44,6 +54,8 @@ function actionTargeted(
 ): ActionTargetedEvent {
   return { ...envelope(), t: "ActionTargeted", card, sourceId, targetId };
 }
+
+const FREEZE = createActionCard("freeze", 1);
 
 const setup = [
   gameCreated(),
@@ -53,95 +65,109 @@ const setup = [
   cardDealt("carol", 7),
 ];
 
-const FREEZE = createActionCard("freeze", 1);
+describe("ActionTargeted — Freeze", () => {
+  it("resolves onto another active player, freezing them and clearing the queue", () => {
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "bob"));
 
-// Nothing in the reducer pipeline populates an "awaiting-target" resolution
-// yet — CardDealt for action cards (Freeze itself) lands in a later M2
-// issue. This state is hand-built to exercise ActionTargeted's validation
-// ahead of that, matching the pattern already used in legalActions.test.ts.
-function withAwaitingTarget(sourcePlayerId: string): GameState {
-  const dealt = fold(setup);
-  const round = dealt.currentRound;
-  if (!round) {
-    throw new Error("expected a round");
-  }
-  return {
-    ...dealt,
-    currentRound: {
-      ...round,
-      pendingResolutions: [{ kind: "awaiting-target", card: FREEZE, sourcePlayerId }],
-    },
-  };
-}
-
-describe("ActionTargeted", () => {
-  it("resolves onto another active player and clears the pending resolution", () => {
-    const state = withAwaitingTarget("alice");
-    const next = reduce(state, actionTargeted(FREEZE, "alice", "bob"));
     expect(next.currentRound?.pendingResolutions).toEqual([]);
+    expect(next.currentRound?.players["bob"]?.status).toBe("frozen");
+    expect(next.currentRound?.players["alice"]?.status).toBe("active");
   });
 
-  it("allows the holder to target themselves", () => {
-    const state = withAwaitingTarget("alice");
-    const next = reduce(state, actionTargeted(FREEZE, "alice", "alice"));
-    expect(next.currentRound?.pendingResolutions).toEqual([]);
+  it("allows the holder to freeze themselves", () => {
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "alice"));
+
+    expect(next.currentRound?.players["alice"]?.status).toBe("frozen");
+  });
+
+  it("scores a frozen player exactly as a stayed player would", () => {
+    const base = [
+      gameCreated(),
+      roundStarted("alice"),
+      cardDealt("alice", 9),
+      cardDealt("alice", 11),
+    ];
+
+    const stayed = fold([...base, playerStayed("alice")]);
+    const frozen = fold([...base, freezeDealt("bob"), actionTargeted(FREEZE, "bob", "alice")]);
+
+    const stayedAlice = stayed.currentRound?.players["alice"];
+    const frozenAlice = frozen.currentRound?.players["alice"];
+    if (!stayedAlice || !frozenAlice) {
+      throw new Error("expected alice in both rounds");
+    }
+
+    expect(frozenAlice.status).toBe("frozen");
+    expect(scoreRound(frozenAlice)).toEqual(scoreRound(stayedAlice));
+  });
+
+  it("ends the round once it freezes the last active player, but not before", () => {
+    const dealt = fold([
+      ...setup,
+      playerStayed("bob"),
+      playerStayed("carol"),
+      freezeDealt("alice"),
+    ]);
+    expect(isRoundOver(dealt)).toBe(false);
+
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "alice"));
+    expect(isRoundOver(next)).toBe(true);
+  });
+
+  it("does not end the round when other players are still active", () => {
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "bob"));
+    expect(isRoundOver(next)).toBe(false);
   });
 
   it("forces self-targeting when the holder is the only active player left", () => {
-    const base = withAwaitingTarget("alice");
-    const round = base.currentRound;
-    if (!round) {
-      throw new Error("expected a round");
-    }
-    const state: GameState = {
-      ...base,
-      currentRound: {
-        ...round,
-        players: {
-          ...round.players,
-          bob: { ...round.players["bob"]!, status: "stayed" },
-          carol: { ...round.players["carol"]!, status: "busted" },
-        },
-      },
-    };
+    const dealt = fold([
+      ...setup,
+      playerStayed("bob"),
+      playerStayed("carol"),
+      freezeDealt("alice"),
+    ]);
 
-    const next = reduce(state, actionTargeted(FREEZE, "alice", "alice"));
-    expect(next.currentRound?.pendingResolutions).toEqual([]);
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "alice"));
+    expect(next.currentRound?.players["alice"]?.status).toBe("frozen");
 
-    expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
+    expect(() => reduce(dealt, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
   });
 
   it.each(["busted", "stayed", "frozen"] as const)("rejects targeting a %s player", (status) => {
-    const base = withAwaitingTarget("alice");
-    const round = base.currentRound;
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    const round = dealt.currentRound;
     if (!round) {
       throw new Error("expected a round");
     }
+    const bob = round.players["bob"];
+    if (!bob) {
+      throw new Error("expected bob in the round");
+    }
     const state: GameState = {
-      ...base,
-      currentRound: {
-        ...round,
-        players: { ...round.players, bob: { ...round.players["bob"]!, status } },
-      },
+      ...dealt,
+      currentRound: { ...round, players: { ...round.players, bob: { ...bob, status } } },
     };
 
     expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
   });
 
   it("rejects targeting a player who isn't in the game", () => {
-    const state = withAwaitingTarget("alice");
-    expect(() => reduce(state, actionTargeted(FREEZE, "alice", "nobody"))).toThrow(DomainError);
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    expect(() => reduce(dealt, actionTargeted(FREEZE, "alice", "nobody"))).toThrow(DomainError);
   });
 
   it("rejects an ActionTargeted event that doesn't match the pending resolution's card", () => {
-    const state = withAwaitingTarget("alice");
+    const dealt = fold([...setup, freezeDealt("alice")]);
     const otherFreeze = createActionCard("freeze", 2);
-    expect(() => reduce(state, actionTargeted(otherFreeze, "alice", "bob"))).toThrow(DomainError);
+    expect(() => reduce(dealt, actionTargeted(otherFreeze, "alice", "bob"))).toThrow(DomainError);
   });
 
   it("rejects an ActionTargeted event from a different source player", () => {
-    const state = withAwaitingTarget("alice");
-    expect(() => reduce(state, actionTargeted(FREEZE, "bob", "carol"))).toThrow(DomainError);
+    const dealt = fold([...setup, freezeDealt("alice")]);
+    expect(() => reduce(dealt, actionTargeted(FREEZE, "bob", "carol"))).toThrow(DomainError);
   });
 
   it("rejects resolving a target when nothing is pending", () => {
@@ -149,6 +175,25 @@ describe("ActionTargeted", () => {
     expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
   });
 
+  it("rejects resolving a target before any round has started", () => {
+    const state = fold([gameCreated()]);
+    expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
+  });
+
+  it("leaves items behind the resolved one untouched", () => {
+    // A second Freeze dealt to a different player while the first is still
+    // pending — nothing yet stops the dealer from doing this — nests behind
+    // it on the queue and survives resolving the front item.
+    const dealt = fold([...setup, freezeDealt("alice", 1), freezeDealt("bob", 2)]);
+    const next = reduce(dealt, actionTargeted(FREEZE, "alice", "alice"));
+
+    expect(next.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "bob" },
+    ]);
+  });
+
+  // Flip Three (forced-draw-remaining) isn't implemented yet, so a queue
+  // whose front item isn't an awaiting-target has to be hand-built.
   it("rejects resolving a target when the front of the queue isn't awaiting one", () => {
     const base = fold(setup);
     const round = base.currentRound;
@@ -168,32 +213,47 @@ describe("ActionTargeted", () => {
     expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
   });
 
-  it("leaves items behind the resolved one untouched", () => {
+  // Nothing deals Flip Three or Second Chance yet, so an awaiting-target
+  // item for either has to be hand-built to exercise these branches ahead
+  // of their own M2 issues.
+  it.each(["flipThree", "secondChance"] as const)(
+    "throws for %s, which doesn't have a target-resolution handler yet",
+    (action) => {
+      const base = fold(setup);
+      const round = base.currentRound;
+      if (!round) {
+        throw new Error("expected a round");
+      }
+      const card = createActionCard(action, 1);
+      const state: GameState = {
+        ...base,
+        currentRound: {
+          ...round,
+          pendingResolutions: [{ kind: "awaiting-target", card, sourcePlayerId: "alice" }],
+        },
+      };
+
+      expect(() => reduce(state, actionTargeted(card, "alice", "bob"))).toThrow(DomainError);
+    },
+  );
+
+  it("throws for a genuinely unknown action type", () => {
     const base = fold(setup);
     const round = base.currentRound;
     if (!round) {
       throw new Error("expected a round");
     }
-    const behind = createActionCard("freeze", 2);
+    const card = { id: "action-bogus-1", kind: "action", action: "bogus" } as unknown as ReturnType<
+      typeof createActionCard
+    >;
     const state: GameState = {
       ...base,
       currentRound: {
         ...round,
-        pendingResolutions: [
-          { kind: "awaiting-target", card: FREEZE, sourcePlayerId: "alice" },
-          { kind: "awaiting-target", card: behind, sourcePlayerId: "bob" },
-        ],
+        pendingResolutions: [{ kind: "awaiting-target", card, sourcePlayerId: "alice" }],
       },
     };
 
-    const next = reduce(state, actionTargeted(FREEZE, "alice", "bob"));
-    expect(next.currentRound?.pendingResolutions).toEqual([
-      { kind: "awaiting-target", card: behind, sourcePlayerId: "bob" },
-    ]);
-  });
-
-  it("rejects resolving a target before any round has started", () => {
-    const state = fold([gameCreated()]);
-    expect(() => reduce(state, actionTargeted(FREEZE, "alice", "bob"))).toThrow(DomainError);
+    expect(() => reduce(state, actionTargeted(card, "alice", "bob"))).toThrow(DomainError);
   });
 });

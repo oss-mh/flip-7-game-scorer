@@ -1,9 +1,35 @@
 import { DomainError } from "../errors.js";
 
+import { applyFreeze } from "./freeze.js";
 import { requireActivePlayerRound, requireCurrentRound, withCurrentRound } from "./roundHelpers.js";
 
+import type { ActionCard } from "../cards.js";
 import type { ActionTargetedEvent } from "../events.js";
-import type { GameState, RoundState } from "../state.js";
+import type { GameState, PlayerRoundState, RoundState } from "../state.js";
+
+/**
+ * Applies whatever effect resolving `card` onto `targetRound` has. Each
+ * action kind owns its own handler; only "freeze" (#59) exists so far.
+ */
+function applyActionCardEffect(
+  round: RoundState,
+  card: ActionCard,
+  targetRound: PlayerRoundState,
+): RoundState {
+  switch (card.action) {
+    case "freeze":
+      return applyFreeze(round, targetRound);
+    case "flipThree":
+    case "secondChance":
+      throw new DomainError(
+        `ActionTargeted for "${card.action}" is not implemented yet (lands in M2)`,
+      );
+    default: {
+      const exhaustive: never = card.action;
+      throw new DomainError(`Unknown action type: ${JSON.stringify(exhaustive)}`);
+    }
+  }
+}
 
 /**
  * Validates and consumes the "awaiting-target" item at the front of the
@@ -13,10 +39,6 @@ import type { GameState, RoundState } from "../state.js";
  * player is always themselves a valid target, which is what makes
  * self-targeting available (and, when they're the only active player left,
  * forced — nothing else in `players` would pass this check).
- *
- * Resolving the target only clears the queue slot; the game-specific effect
- * of each action kind (e.g. Freeze banking the target's score) is applied
- * by that card's own handler, not here.
  */
 export function applyActionTargeted(state: GameState, event: ActionTargetedEvent): GameState {
   const round = requireCurrentRound(state);
@@ -31,12 +53,14 @@ export function applyActionTargeted(state: GameState, event: ActionTargetedEvent
     );
   }
 
-  requireActivePlayerRound(round, event.targetId);
+  const targetRound = requireActivePlayerRound(round, event.targetId);
 
-  const updatedRound: RoundState = {
+  const dequeuedRound: RoundState = {
     ...round,
     pendingResolutions: round.pendingResolutions.slice(1),
   };
 
-  return withCurrentRound(state, updatedRound);
+  const resolvedRound = applyActionCardEffect(dequeuedRound, pending.card, targetRound);
+
+  return withCurrentRound(state, resolvedRound);
 }

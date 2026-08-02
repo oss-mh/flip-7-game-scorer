@@ -204,13 +204,54 @@ describe("CardDealt — modifier cards", () => {
   });
 });
 
+describe("CardDealt — Freeze", () => {
+  function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
+    return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
+  }
+
+  it("queues an awaiting-target resolution instead of joining either card row", () => {
+    const state = fold([...setup, freezeDealt("alice")]);
+    const alice = state.currentRound?.players["alice"];
+    expect(alice?.numberCards).toEqual([]);
+    expect(alice?.modifierCards).toEqual([]);
+    expect(state.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: createActionCard("freeze", 1), sourcePlayerId: "alice" },
+    ]);
+  });
+
+  it("records the card in the round's cardsDealt log", () => {
+    const state = fold([...setup, freezeDealt("alice")]);
+    expect(state.currentRound?.cardsDealt).toEqual([createActionCard("freeze", 1)]);
+  });
+
+  it("leaves the drawing player active — they aren't the target yet", () => {
+    const state = fold([...setup, freezeDealt("alice")]);
+    expect(state.currentRound?.players["alice"]?.status).toBe("active");
+  });
+
+  it("rejects dealing to a non-active player", () => {
+    const events = [...setup, cardDealt("bob", 5), cardDealt("bob", 5, 2), freezeDealt("bob")];
+    expect(() => fold(events)).toThrow(DomainError);
+  });
+});
+
 describe("CardDealt — cards not yet handled", () => {
-  it("throws for action cards, which land in M2", () => {
+  it("throws for Flip Three action cards, which land in a later M2 issue", () => {
     const event: GameEvent = {
       ...envelope(),
       t: "CardDealt",
       playerId: "alice",
-      card: createActionCard("freeze", 1),
+      card: createActionCard("flipThree", 1),
+    };
+    expect(() => fold([...setup, event])).toThrow(DomainError);
+  });
+
+  it("throws for Second Chance action cards, which land in a later M2 issue", () => {
+    const event: GameEvent = {
+      ...envelope(),
+      t: "CardDealt",
+      playerId: "alice",
+      card: createActionCard("secondChance", 1),
     };
     expect(() => fold([...setup, event])).toThrow(DomainError);
   });
@@ -221,6 +262,16 @@ describe("CardDealt — cards not yet handled", () => {
       t: "CardDealt",
       playerId: "alice",
       card: { id: "bogus-1", kind: "bogus" },
+    } as unknown as GameEvent;
+    expect(() => fold([...setup, event])).toThrow(DomainError);
+  });
+
+  it("throws for a genuinely unknown action type", () => {
+    const event = {
+      ...envelope(),
+      t: "CardDealt",
+      playerId: "alice",
+      card: { id: "action-bogus-1", kind: "action", action: "bogus" },
     } as unknown as GameEvent;
     expect(() => fold([...setup, event])).toThrow(DomainError);
   });
