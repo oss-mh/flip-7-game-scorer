@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { GameRepositoryProvider } from "../lib/gameRepositoryContext";
+import { GameRepositoryProvider } from "@/lib/gameRepositoryContext";
 
 import type { Metadata, Viewport } from "next";
 

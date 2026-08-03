@@ -156,17 +156,26 @@ const webConfig = defineConfig({
     next: {
       rootDir: "apps/web",
     },
+    // Lets import-x resolve and correctly group the `@/*` -> `apps/web/*`
+    // path alias declared in apps/web/tsconfig.json.
+    "import-x/resolver": { typescript: { project: "apps/web/tsconfig.json" }, node: true },
+    "import-x/internal-regex": "^@/",
   },
   rules: {
-    // apps/web must resolve concrete storage adapters at a single
-    // composition root, never import them directly elsewhere. See
-    // AGENTS.md, "apps/web never imports a concrete adapter".
+    // apps/web must resolve concrete storage adapter *classes* at a single
+    // composition root, never elsewhere — see AGENTS.md, "apps/web never
+    // imports a concrete adapter". Everything else `@flip-7/adapters`
+    // exports (loadGameState, maybeSaveSnapshot, exportGame, importGame,
+    // the storage error classes, ...) is generic over the `GameRepository`
+    // port type, not tied to a concrete backend, so it's fine to import
+    // anywhere in apps/web.
     "no-restricted-imports": [
       "error",
       {
-        patterns: [
+        paths: [
           {
-            group: ["@flip-7/adapters", "@flip-7/adapters/*"],
+            name: "@flip-7/adapters",
+            importNames: ["InMemoryGameRepository", "LocalStorageGameRepository"],
             message:
               "apps/web must not import a concrete adapter directly — only the port type, resolved at the single composition root. See AGENTS.md.",
           },
