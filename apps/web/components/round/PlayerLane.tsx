@@ -1,6 +1,7 @@
 "use client";
 
 import { scoreRound } from "@flip-7/engine";
+import { useEffect, useRef, useState } from "react";
 
 import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
@@ -8,6 +9,9 @@ import { CardTile } from "./CardTile";
 import { StatusBadge } from "./StatusBadge";
 
 import type { Player, PlayerRoundState } from "@flip-7/engine";
+
+/** How long the "used it!" treatment stays up after a Second Chance saves a bust — #72. */
+const SECOND_CHANCE_SAVE_DISPLAY_MS = 1600;
 
 /**
  * One player's lane: mirrors the physical table layout (#37) — a modifier
@@ -34,6 +38,24 @@ export function PlayerLane({
   const isFlipped7 = playerRound.status === "flipped7";
   const isActive = playerRound.status === "active";
   const hasCards = playerRound.numberCards.length > 0 || playerRound.modifierCards.length > 0;
+
+  // A held Second Chance goes non-null → null two ways: it just saved a bust
+  // (playerRound.status is still "active" — the near-miss worth celebrating,
+  // see AGENTS.md design priorities), or the round ended and it discarded
+  // unused (every player is inactive by then — see RoundBoard's round-over
+  // notice for that case instead). Only the first should animate here.
+  const previousHeldRef = useRef(playerRound.heldSecondChance);
+  const [justSaved, setJustSaved] = useState(false);
+  useEffect(() => {
+    const previouslyHeld = previousHeldRef.current;
+    previousHeldRef.current = playerRound.heldSecondChance;
+    if (previouslyHeld && !playerRound.heldSecondChance && playerRound.status === "active") {
+      setJustSaved(true);
+      const timeout = setTimeout(() => setJustSaved(false), SECOND_CHANCE_SAVE_DISPLAY_MS);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [playerRound.heldSecondChance, playerRound.status]);
 
   return (
     <li
@@ -68,6 +90,15 @@ export function PlayerLane({
       {playerRound.heldSecondChance && (
         <span className="text-card-action w-fit rounded-full border border-card-action/60 px-2 py-0.5 text-xs font-medium">
           Holding 2nd Chance
+        </span>
+      )}
+
+      {justSaved && (
+        <span
+          role="status"
+          className="text-status-active w-fit animate-bounce rounded-full border border-status-active bg-status-active/10 px-2 py-0.5 text-xs font-semibold"
+        >
+          Second Chance used — saved!
         </span>
       )}
 

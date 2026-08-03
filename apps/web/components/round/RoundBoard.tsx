@@ -49,6 +49,9 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const pending = nextResolution(state);
   const roundOver = isRoundOver(state);
   const currentLegal = currentPlayerId ? legalActions(state, currentPlayerId) : null;
+  const unusedSecondChanceHolders = state.players
+    .filter((player) => round.players[player.id]?.heldSecondChance)
+    .map((player) => player.name);
 
   async function handleHitDeal(card: Card) {
     if (!currentPlayerId) return;
@@ -170,9 +173,17 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
           />
         ) : roundOver ? (
-          <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
-            Close round &amp; deal next
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            {unusedSecondChanceHolders.length > 0 && (
+              <p className="text-card-action text-center text-xs">
+                Unused Second Chance{unusedSecondChanceHolders.length > 1 ? "s" : ""} —{" "}
+                {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
+              </p>
+            )}
+            <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
+              Close round &amp; deal next
+            </button>
+          </div>
         ) : currentPlayerId && currentLegal ? (
           <>
             {showPicker ? (
