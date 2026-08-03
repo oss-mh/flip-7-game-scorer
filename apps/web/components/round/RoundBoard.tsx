@@ -5,12 +5,13 @@ import { useState } from "react";
 
 import { nextDealerId } from "@/lib/turnOrder";
 
+import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardPicker } from "./CardPicker";
 import { PlayerLane } from "./PlayerLane";
 import { useCurrentPlayer } from "./useCurrentPlayer";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { Card } from "@flip-7/engine";
+import type { ActionCard, Card, PlayerId } from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
@@ -79,6 +80,18 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     }
   }
 
+  async function handleResolveTarget(card: ActionCard, sourceId: PlayerId, targetId: PlayerId) {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch([{ t: "ActionTargeted", card, sourceId, targetId }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleCloseRound() {
     if (!round) return;
     setActionError(null);
@@ -123,8 +136,19 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
       {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
       <div className="mt-auto flex flex-col gap-3">
-        {pending ? (
-          <p className="text-muted-foreground text-center text-sm">Resolving an action card…</p>
+        {pending?.kind === "awaiting-target" ? (
+          <ActionTargetPrompt
+            card={pending.card}
+            sourcePlayerId={pending.sourcePlayerId}
+            round={round}
+            players={state.players}
+            busy={busy}
+            onResolve={(targetId) =>
+              void handleResolveTarget(pending.card, pending.sourcePlayerId, targetId)
+            }
+          />
+        ) : pending?.kind === "forced-draw-remaining" ? (
+          <p className="text-muted-foreground text-center text-sm">Flip Three in progress…</p>
         ) : roundOver ? (
           <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
             Close round &amp; deal next
