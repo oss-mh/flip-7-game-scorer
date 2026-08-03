@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_TARGET_SCORE, EVENT_SCHEMA_VERSION } from "@flip-7/engine";
+import { DEFAULT_TARGET_SCORE, EVENT_SCHEMA_VERSION, deckCountForPlayerCount } from "@flip-7/engine";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -26,6 +26,7 @@ export default function NewGamePage() {
   const [players, setPlayers] = useState<readonly DraftPlayer[]>([]);
   const [nameInput, setNameInput] = useState("");
   const [dealerId, setDealerId] = useState<string | null>(null);
+  const [targetScoreInput, setTargetScoreInput] = useState(String(DEFAULT_TARGET_SCORE));
   const [recentNames, setRecentNames] = useState<readonly string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -93,7 +94,10 @@ export default function NewGamePage() {
 
   const hasEmptyName = players.some((p) => p.name.trim().length === 0);
   const hasEnoughPlayers = players.length >= 2;
-  const isValid = hasEnoughPlayers && !hasEmptyName;
+  const targetScore = Number(targetScoreInput);
+  const hasValidTargetScore = Number.isInteger(targetScore) && targetScore > 0;
+  const deckCount = deckCountForPlayerCount(players.length);
+  const isValid = hasEnoughPlayers && !hasEmptyName && hasValidTargetScore;
 
   async function handleSubmit() {
     if (!isValid) return;
@@ -110,7 +114,7 @@ export default function NewGamePage() {
       await repository.createGame({
         id: gameId,
         players: finalPlayers,
-        targetScore: DEFAULT_TARGET_SCORE,
+        targetScore,
         createdAt: at,
       });
 
@@ -120,6 +124,7 @@ export default function NewGamePage() {
         seq: 1,
         t: "GameCreated",
         players: finalPlayers,
+        targetScore,
       };
       const roundStarted: RoundStartedEvent = {
         schemaVersion: EVENT_SCHEMA_VERSION,
@@ -148,6 +153,19 @@ export default function NewGamePage() {
           void handleSubmit();
         }}
       >
+        <label className="flex flex-col gap-1">
+          <span className="text-sm">Target score</span>
+          <input
+            className="rounded border border-border bg-surface px-3"
+            style={{ minHeight: "var(--touch-target)" }}
+            type="number"
+            min={1}
+            step={1}
+            value={targetScoreInput}
+            onChange={(event) => setTargetScoreInput(event.target.value)}
+          />
+        </label>
+
         <div className="flex gap-2">
           <input
             className="flex-1 rounded border border-border bg-surface px-3"
@@ -216,11 +234,21 @@ export default function NewGamePage() {
           ))}
         </ol>
 
+        {players.length > 0 && (
+          <p className="text-muted-foreground text-sm">
+            Playing with {deckCount} deck{deckCount > 1 ? "s" : ""}
+            {deckCount > 1 && " — recommended above 18 players"}
+          </p>
+        )}
+
         {hasEmptyName && (
           <p className="text-status-busted text-sm">Every player needs a name.</p>
         )}
         {!hasEnoughPlayers && (
           <p className="text-muted-foreground text-sm">Add at least 2 players to start.</p>
+        )}
+        {!hasValidTargetScore && (
+          <p className="text-status-busted text-sm">Target score must be a positive whole number.</p>
         )}
         {submitError && <p className="text-status-busted text-sm">{submitError}</p>}
 
