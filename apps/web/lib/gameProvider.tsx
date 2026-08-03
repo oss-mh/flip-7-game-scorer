@@ -2,12 +2,27 @@
 
 import { maybeSaveSnapshot } from "@flip-7/adapters";
 import { EVENT_SCHEMA_VERSION, fold, reduce } from "@flip-7/engine";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { useGameRepository } from "./gameRepositoryContext";
 import { systemClock } from "./systemClock";
 
-import type { GameEvent, GameId, GameRepository, GameState } from "@flip-7/engine";
+import type {
+  Card,
+  CardDealtEvent,
+  GameEvent,
+  GameId,
+  GameRepository,
+  GameState,
+} from "@flip-7/engine";
 import type { ReactNode } from "react";
 
 /** A `GameEvent` minus the envelope fields `dispatch` fills in itself. */
@@ -64,6 +79,8 @@ export type GameQuery =
   | {
       readonly status: "ready";
       readonly state: GameState;
+      /** The full event log, in order — lets a component locate a specific past `CardDealt` for `correctCard`. */
+      readonly events: readonly GameEvent[];
       readonly dispatch: (commands: readonly GameCommand[]) => Promise<void>;
       readonly undo: () => Promise<void>;
       readonly redo: () => Promise<void>;
@@ -71,6 +88,18 @@ export type GameQuery =
       readonly canRedo: boolean;
       /** The most recently undone event, for a "you undid: ..." confirmation. `null` once redone or superseded by a new dispatch. */
       readonly lastUndone: GameEvent | null;
+      /**
+       * Mistap correction (#74) — "we noticed three cards ago", as opposed
+       * to `undo`'s "the last action". Rewrites `target` in place
+       * (`replacement` non-null) or drops it entirely (`replacement` null),
+       * then re-validates every later event in the log by fully replaying
+       * it through `fold` before anything is persisted. A later event that
+       * depended on `target` — an `ActionTargeted` resolving a Freeze it
+       * revealed, say — fails that replay and the whole correction is
+       * rejected untouched, per AGENTS.md invariant #4: the log is never
+       * left in a state a real sequence of events couldn't have produced.
+       */
+      readonly correctCard: (target: CardDealtEvent, replacement: Card | null) => Promise<void>;
     };
 
 const GameContext = createContext<GameQuery | null>(null);
@@ -251,6 +280,66 @@ function GameProviderSession({
     }
   }, [gameId, repository]);
 
+  const correctCard = useCallback(
+    async (target: CardDealtEvent, replacement: Card | null): Promise<void> => {
+      const current = dataRef.current;
+      if (current.status !== "ready") {
+        throw new Error(`Cannot correct a card while the game is "${current.status}"`);
+      }
+
+      const { events: previousEvents } = current;
+      const targetIndex = previousEvents.findIndex(
+        (event) => event.t === "CardDealt" && event.seq === target.seq,
+      );
+      if (targetIndex === -1) {
+        throw new Error("That card is no longer in the event log");
+      }
+
+      const correctedMiddle: GameEvent[] = replacement ? [{ ...target, card: replacement }] : [];
+      const rebuilt = [
+        ...previousEvents.slice(0, targetIndex),
+        ...correctedMiddle,
+        ...previousEvents.slice(targetIndex + 1),
+      ].map((event, index) => ({ ...event, seq: index + 1 }));
+
+      // Re-validate the entire corrected log by fully replaying it before
+      // touching storage — see the `correctCard` doc comment on `GameQuery`.
+      let nextState: GameState;
+      try {
+        nextState = fold(rebuilt);
+      } catch (error) {
+        throw new Error(
+          `Can't correct that card — a later play in the round depends on it (${toError(error).message})`,
+        );
+      }
+
+      // Truncate only down to the correction point, not the whole log: if
+      // this crashes between the truncate and the append below, storage is
+      // left at a valid earlier prefix (the same degrade an interrupted
+      // `undo` risks) rather than empty. See AGENTS.md design priorities,
+      // "Never lose someone's scores".
+      const tail = rebuilt.slice(targetIndex);
+      await repository.truncateEvents(gameId, targetIndex);
+      const result = await repository.appendEvents(gameId, tail, targetIndex);
+      if (result.outcome === "conflict") {
+        throw new Error(
+          `Write conflict while correcting: expected version ${targetIndex}, storage is at ${result.currentVersion}`,
+        );
+      }
+
+      setData({ status: "ready", state: nextState, events: rebuilt });
+      setRedoStack([]);
+      setLastUndone(null);
+
+      try {
+        await maybeSaveSnapshot(repository, gameId, targetIndex, result.version, nextState);
+      } catch {
+        // Best-effort, see the equivalent comment in `dispatch`.
+      }
+    },
+    [gameId, repository],
+  );
+
   const value = useMemo<GameQuery>(() => {
     switch (data.status) {
       case "loading":
@@ -263,15 +352,17 @@ function GameProviderSession({
         return {
           status: "ready",
           state: data.state,
+          events: data.events,
           dispatch,
           undo,
           redo,
           canUndo: data.events.length > undoFloor(data.events),
           canRedo: redoStack.length > 0,
           lastUndone,
+          correctCard,
         };
     }
-  }, [data, dispatch, undo, redo, redoStack, lastUndone, retry]);
+  }, [data, dispatch, undo, redo, correctCard, redoStack, lastUndone, retry]);
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }

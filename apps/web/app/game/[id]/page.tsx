@@ -1,5 +1,6 @@
 "use client";
 
+import { RoundBoard } from "@/components/round/RoundBoard";
 import { describeEvent } from "@/lib/describeEvent";
 import { useGame } from "@/lib/gameProvider";
 
@@ -37,17 +38,14 @@ export default function GamePage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4">
+    <div className="flex flex-1 flex-col gap-2">
       {game.lastUndone && (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className="text-muted-foreground px-3 pt-2 text-sm" role="status">
           Undid: {describeEvent(game.lastUndone, game.state.players)}
         </p>
       )}
-      <main className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Round {game.state.roundNumber}</h1>
-        <p className="text-muted-foreground">Round play — coming soon.</p>
-      </main>
-      <div className="flex gap-2">
+      <RoundBoard game={game} />
+      <div className="flex justify-center gap-2 p-3">
         <button disabled={!game.canUndo} onClick={() => void game.undo()}>
           Undo
         </button>
