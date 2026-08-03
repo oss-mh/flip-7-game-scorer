@@ -25,13 +25,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # packages/adapters resolves @flip-7/engine through its package.json
-      # exports field, which points at dist/ — so lint, typecheck and test
-      # all need it built first on a clean checkout. The full `pnpm build`
+      # packages/adapters resolves @flip-7/engine, and apps/web resolves both
+      # @flip-7/engine and @flip-7/adapters, through package.json exports
+      # fields that point at dist/ — so lint, typecheck and test all need
+      # every package built first on a clean checkout. The full `pnpm build`
       # below (including apps/web's Next.js build) stays last so the cheap
       # checks still fail fast ahead of it.
       - name: Build workspace packages
-        run: pnpm --filter @flip-7/engine build
+        run: pnpm --filter "./packages/*" build
 
       - name: Lint
         run: pnpm lint

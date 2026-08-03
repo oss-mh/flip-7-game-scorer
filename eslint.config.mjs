@@ -161,10 +161,6 @@ const webConfig = defineConfig({
     // apps/web must resolve concrete storage adapters at a single
     // composition root, never import them directly elsewhere. See
     // AGENTS.md, "apps/web never imports a concrete adapter".
-    //
-    // packages/adapters doesn't exist yet (it lands in M3); once the
-    // composition root file exists, add a second config object here
-    // scoped to that file's path with this rule turned back off.
     "no-restricted-imports": [
       "error",
       {
@@ -177,6 +173,16 @@ const webConfig = defineConfig({
         ],
       },
     ],
+  },
+});
+
+// The one exception to webConfig's adapter import ban: the composition root
+// itself, which is the single place allowed to choose a concrete adapter.
+// See AGENTS.md, "apps/web never imports a concrete adapter".
+const compositionRootConfig = defineConfig({
+  files: ["apps/web/lib/compositionRoot.ts"],
+  rules: {
+    "no-restricted-imports": "off",
   },
 });
 
@@ -193,5 +199,6 @@ export default defineConfig([
   enginePurityConfig,
   engineTestingDoublesConfig,
   webConfig,
+  compositionRootConfig,
   eslintConfigPrettier,
 ]);

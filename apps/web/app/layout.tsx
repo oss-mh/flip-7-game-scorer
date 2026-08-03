@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { GameRepositoryProvider } from "../lib/gameRepositoryContext";
+
 import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
@@ -32,10 +34,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-border px-4 py-3">
-          <span className="text-lg font-semibold tracking-tight">Flip 7 Scorekeeper</span>
-        </header>
-        <main className="flex flex-1 flex-col">{children}</main>
+        <GameRepositoryProvider>
+          <header className="border-b border-border px-4 py-3">
+            <span className="text-lg font-semibold tracking-tight">Flip 7 Scorekeeper</span>
+          </header>
+          <main className="flex flex-1 flex-col">{children}</main>
+        </GameRepositoryProvider>
       </body>
     </html>
   );
