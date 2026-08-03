@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+/*
+ * Dark-only by default — this app is used in dim rooms around a physical
+ * table, not read in daylight. There is no light theme to fall back to.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --background: #0a0a0c;
+  --foreground: #f4f4f5;
+  --surface: #18181b;
+  --border: #2b2b31;
+  --muted-foreground: #a1a1aa;
+
+  /* Card type accents — mirrors packages/engine `Card["kind"]`. */
+  --card-number: #38bdf8;
+  --card-modifier: #c084fc;
+  --card-action: #fb923c;
+
+  /* Player round status accents — mirrors packages/engine `PlayerRoundStatus`. */
+  --status-active: #34d399;
+  --status-stayed: #94a3b8;
+  --status-busted: #f87171;
+  --status-frozen: #22d3ee;
+  --status-flipped7: #fbbf24;
+
+  /* WCAG 2.5.5 minimum tap target size. */
+  --touch-target: 2.75rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-card-number: var(--card-number);
+  --color-card-modifier: var(--card-modifier);
+  --color-card-action: var(--card-action);
+
+  --color-status-active: var(--status-active);
+  --color-status-stayed: var(--status-stayed);
+  --color-status-busted: var(--status-busted);
+  --color-status-frozen: var(--status-frozen);
+  --color-status-flipped7: var(--status-flipped7);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --spacing-touch: var(--touch-target);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Large touch targets are a baseline, not an afterthought — every button
+ * meets the minimum tap size unless a component opts out explicitly.
+ */
+@layer base {
+  button {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
 }
