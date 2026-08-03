@@ -61,6 +61,22 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages/adapters:
+    dependencies:
+      '@flip-7/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^4.1.10
+        version: 4.1.10(vitest@4.1.10)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@20.19.43)(@vitest/coverage-v8@4.1.10)(vite@8.2.0(@types/node@20.19.43)(jiti@2.7.0))
+
   packages/engine:
     devDependencies:
       '@vitest/coverage-v8':

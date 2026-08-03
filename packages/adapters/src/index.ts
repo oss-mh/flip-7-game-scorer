@@ -1,0 +1,17 @@
+export {
+  GameAlreadyExistsError,
+  GameNotFoundError,
+  MalformedExportError,
+  StorageFullError,
+  StorageUnavailableError,
+} from "./errors.js";
+export { EXPORT_SCHEMA_VERSION, exportGame, importGame } from "./exportImport.js";
+export type { ExportedGame } from "./exportImport.js";
+export { InMemoryGameRepository } from "./inMemoryGameRepository.js";
+export { LocalStorageGameRepository } from "./localStorageGameRepository.js";
+export {
+  DEFAULT_SNAPSHOT_INTERVAL,
+  crossedSnapshotInterval,
+  loadGameState,
+  maybeSaveSnapshot,
+} from "./snapshotting.js";

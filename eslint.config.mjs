@@ -42,9 +42,21 @@ const DOM_GLOBALS = [
   "history",
 ];
 
-// packages/* are plain TypeScript with no React/DOM — a lighter rule set
-// than apps/web needs, plus the architectural boundary: the engine must
-// stay pure. See AGENTS.md, "packages/engine stays pure".
+// The system clock and system entropy sources banned from packages/engine.
+// See AGENTS.md invariant #2, "No non-determinism in the domain": a Clock
+// or IdGenerator port takes their place so replaying a log always produces
+// byte-identical state. `Math.random()` is banned separately below, since
+// `no-restricted-globals` can't ban one property of the `Math` global
+// without banning legitimate deterministic methods (`Math.floor`, etc.)
+// alongside it.
+const NON_DETERMINISM_GLOBALS = ["Date", "crypto"];
+
+// packages/* are plain TypeScript with no React/Next — apps/web is the only
+// workspace allowed to depend on either. This alone doesn't ban the DOM:
+// packages/adapters (M3) legitimately needs `localStorage`/`window` for its
+// LocalStorage adapter, so the DOM/determinism bans below are scoped more
+// narrowly to packages/engine specifically. See AGENTS.md,
+// "packages/engine stays pure".
 const packagesConfig = defineConfig({
   files: ["packages/**/*.{ts,tsx}"],
   extends: [tseslint.configs.recommended],
@@ -55,29 +67,34 @@ const packagesConfig = defineConfig({
         paths: [
           {
             name: "react",
-            message:
-              "packages/engine is pure domain logic and must never depend on React. See AGENTS.md.",
+            message: "packages/* must never depend on React. See AGENTS.md.",
           },
           {
             name: "react-dom",
-            message:
-              "packages/engine is pure domain logic and must never depend on React. See AGENTS.md.",
+            message: "packages/* must never depend on React. See AGENTS.md.",
           },
           {
             name: "next",
-            message:
-              "packages/engine is pure domain logic and must never depend on Next.js. See AGENTS.md.",
+            message: "packages/* must never depend on Next.js. See AGENTS.md.",
           },
         ],
         patterns: [
           {
             group: ["react/*", "react-dom/*", "next/*"],
-            message:
-              "packages/engine is pure domain logic and must never depend on React or Next.js. See AGENTS.md.",
+            message: "packages/* must never depend on React or Next.js. See AGENTS.md.",
           },
         ],
       },
     ],
+  },
+});
+
+// packages/engine specifically must stay pure: no DOM, no system clock, no
+// system entropy. See AGENTS.md, "packages/engine stays pure" and
+// invariant #2, "No non-determinism in the domain".
+const enginePurityConfig = defineConfig({
+  files: ["packages/engine/**/*.{ts,tsx}"],
+  rules: {
     "no-restricted-globals": [
       "error",
       ...DOM_GLOBALS.map((name) => ({
@@ -85,6 +102,45 @@ const packagesConfig = defineConfig({
         message:
           "packages/engine is pure domain logic and must never touch the DOM. Take a port (Clock/IdGenerator/etc.) instead. See AGENTS.md.",
       })),
+      ...NON_DETERMINISM_GLOBALS.map((name) => ({
+        name,
+        message:
+          "packages/engine must never touch the system clock or system entropy directly. Take a Clock or IdGenerator port instead. See AGENTS.md.",
+      })),
+    ],
+    "no-restricted-properties": [
+      "error",
+      {
+        object: "Math",
+        property: "random",
+        message:
+          "packages/engine must never call Math.random() directly. Take a Shuffler or IdGenerator port instead. See AGENTS.md.",
+      },
+    ],
+  },
+});
+
+// The one intentional exception to the ban above: deterministic
+// Clock/IdGenerator/Shuffler test doubles need `Date` as vocabulary to
+// build a fake from a fixed input (e.g. `new Date(fixedMs).toISOString()`).
+// They never read the wall clock — `crypto` and `Math.random()` stay
+// banned here too, since a real seeded PRNG is exactly the point of a
+// `Shuffler` double, not a shortcut around building one.
+const engineTestingDoublesConfig = defineConfig({
+  files: ["packages/engine/src/testing/**/*.{ts,tsx}"],
+  rules: {
+    "no-restricted-globals": [
+      "error",
+      ...DOM_GLOBALS.map((name) => ({
+        name,
+        message:
+          "packages/engine is pure domain logic and must never touch the DOM. Take a port (Clock/IdGenerator/etc.) instead. See AGENTS.md.",
+      })),
+      {
+        name: "crypto",
+        message:
+          "Deterministic test doubles must never touch system entropy either. Build a seeded fake instead. See AGENTS.md.",
+      },
     ],
   },
 });
@@ -134,6 +190,8 @@ export default defineConfig([
   ]),
   importOrder,
   packagesConfig,
+  enginePurityConfig,
+  engineTestingDoublesConfig,
   webConfig,
   eslintConfigPrettier,
 ]);
