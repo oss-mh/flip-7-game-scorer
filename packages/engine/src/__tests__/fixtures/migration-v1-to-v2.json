@@ -1,0 +1,18 @@
+{
+  "before": {
+    "schemaVersion": 1,
+    "at": "2026-08-02T10:00:02.000Z",
+    "seq": 3,
+    "t": "CardDealt",
+    "playerId": "alice",
+    "card": { "id": "num-5-1", "kind": "number", "value": 5 }
+  },
+  "after": {
+    "schemaVersion": 2,
+    "at": "2026-08-02T10:00:02.000Z",
+    "seq": 3,
+    "t": "CardDealt",
+    "holderId": "alice",
+    "card": { "id": "num-5-1", "kind": "number", "value": 5 }
+  }
+}

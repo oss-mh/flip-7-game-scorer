@@ -20,7 +20,7 @@ export {
   isNumberCard,
 } from "./cards.js";
 export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
-export { DomainError } from "./errors.js";
+export { DomainError, SchemaMigrationError } from "./errors.js";
 export type {
   ActionTargetedEvent,
   CardDealtEvent,
@@ -33,6 +33,8 @@ export type {
   RoundStartedEvent,
 } from "./events.js";
 export { EVENT_SCHEMA_VERSION } from "./events.js";
+export { EVENT_MIGRATIONS, migrateEvent } from "./migrations/index.js";
+export type { EventMigration, RawEvent } from "./migrations/index.js";
 export type { Player, PlayerId } from "./player.js";
 export type { Clock } from "./ports/clock.js";
 export type {
