@@ -49,6 +49,17 @@ export interface GameRepository {
     events: readonly GameEvent[],
     expectedVersion: number,
   ): Promise<AppendResult>;
+  /**
+   * Drops every event from `toVersion` onward, keeping `[0, toVersion)`. The
+   * one sanctioned way to shrink the log — see AGENTS.md invariant #4, "The
+   * event log is append-only": corrections are new events, or this explicit
+   * truncation, never an in-place edit or delete of a stored event. Used by
+   * undo, which is otherwise a plain client-side operation. A stored
+   * snapshot taken at or after `toVersion` is no longer a valid prefix of
+   * the truncated log and must be dropped along with the events; one taken
+   * before `toVersion` is still valid and is left alone.
+   */
+  truncateEvents(gameId: GameId, toVersion: number): Promise<void>;
   saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void>;
   loadSnapshot(gameId: GameId): Promise<Snapshot | null>;
   deleteGame(gameId: GameId): Promise<void>;

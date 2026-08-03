@@ -58,9 +58,10 @@ describe("InMemoryGameRepository", () => {
     await expect(repo.createGame(buildMeta("game-1"))).rejects.toThrow(GameAlreadyExistsError);
   });
 
-  it("rejects loading events, appending, snapshotting or deleting from an unknown game", async () => {
+  it("rejects loading events, appending, truncating, snapshotting or deleting from an unknown game", async () => {
     await expect(repo.loadEvents("missing")).rejects.toThrow(GameNotFoundError);
     await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow(GameNotFoundError);
+    await expect(repo.truncateEvents("missing", 0)).rejects.toThrow(GameNotFoundError);
     await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow(GameNotFoundError);
     await expect(repo.loadSnapshot("missing")).rejects.toThrow(GameNotFoundError);
   });

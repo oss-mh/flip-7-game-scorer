@@ -168,6 +168,19 @@ export class LocalStorageGameRepository implements GameRepository {
     return { outcome: "appended", version: updated.length };
   }
 
+  async truncateEvents(gameId: GameId, toVersion: number): Promise<void> {
+    const storage = getStorage();
+    this.#requireGame(storage, gameId);
+
+    const existing = readJsonArray<StoredEvent>(storage, eventsKey(gameId));
+    writeJson(storage, eventsKey(gameId), existing.slice(0, toVersion));
+
+    const snapshot = readJsonObject<Snapshot>(storage, snapshotKey(gameId));
+    if (snapshot !== null && snapshot.version >= toVersion) {
+      storage.removeItem(snapshotKey(gameId));
+    }
+  }
+
   async saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void> {
     const storage = getStorage();
     this.#requireGame(storage, gameId);

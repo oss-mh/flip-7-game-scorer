@@ -1,5 +1,6 @@
 "use client";
 
+import { describeEvent } from "@/lib/describeEvent";
 import { useGame } from "@/lib/gameProvider";
 
 export default function GamePage() {
@@ -36,13 +37,24 @@ export default function GamePage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4">
+      {game.lastUndone && (
+        <p className="text-muted-foreground text-sm" role="status">
+          Undid: {describeEvent(game.lastUndone, game.state.players)}
+        </p>
+      )}
       <main className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Round {game.state.roundNumber}
-        </h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Round {game.state.roundNumber}</h1>
         <p className="text-muted-foreground">Round play — coming soon.</p>
       </main>
+      <div className="flex gap-2">
+        <button disabled={!game.canUndo} onClick={() => void game.undo()}>
+          Undo
+        </button>
+        <button disabled={!game.canRedo} onClick={() => void game.redo()}>
+          Redo
+        </button>
+      </div>
     </div>
   );
 }

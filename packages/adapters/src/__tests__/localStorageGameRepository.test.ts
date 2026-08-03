@@ -117,9 +117,10 @@ describe("LocalStorageGameRepository", () => {
     await expect(repo.createGame(buildMeta("game-1"))).rejects.toThrow(GameAlreadyExistsError);
   });
 
-  it("rejects loading events, appending, snapshotting or deleting from an unknown game", async () => {
+  it("rejects loading events, appending, truncating, snapshotting or deleting from an unknown game", async () => {
     await expect(repo.loadEvents("missing")).rejects.toThrow(GameNotFoundError);
     await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow(GameNotFoundError);
+    await expect(repo.truncateEvents("missing", 0)).rejects.toThrow(GameNotFoundError);
     await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow(GameNotFoundError);
     await expect(repo.loadSnapshot("missing")).rejects.toThrow(GameNotFoundError);
   });
@@ -157,6 +158,22 @@ describe("LocalStorageGameRepository", () => {
     await repo.appendEvents("game-1", [second], 1);
 
     await expect(repo.loadEvents("game-1", 1)).resolves.toEqual([second]);
+  });
+
+  it("truncates the stored event log in a single write", async () => {
+    await repo.createGame(buildMeta());
+    const first = buildGameCreatedEvent(0);
+    const second = { ...buildGameCreatedEvent(1), t: "RoundStarted" as const, dealerId: "alice" };
+    await repo.appendEvents("game-1", [first, second], 0);
+    const setItemSpy = vi.spyOn(window.localStorage, "setItem");
+
+    await repo.truncateEvents("game-1", 1);
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+    await expect(repo.loadEvents("game-1")).resolves.toEqual([first]);
+    expect(window.localStorage.getItem("flip7:v1:game:game-1:events")).toBe(
+      JSON.stringify([first]),
+    );
   });
 
   it("returns null from loadSnapshot when none has been saved", async () => {

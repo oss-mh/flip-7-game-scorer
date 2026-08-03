@@ -111,6 +111,7 @@ describe("loadGameState", () => {
       listGames: async () => [],
       loadEvents,
       appendEvents: async () => ({ outcome: "appended", version: events.length }),
+      truncateEvents: async () => {},
       saveSnapshot: async () => {},
       loadSnapshot: async () => ({
         version: 10,

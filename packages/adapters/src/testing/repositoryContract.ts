@@ -122,6 +122,50 @@ export function runRepositoryContractTests(makeRepo: () => GameRepository): void
       });
     });
 
+    describe("truncateEvents", () => {
+      it("drops events from toVersion onward, keeping the prefix", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        const first = buildEvent(0);
+        const second = { ...buildEvent(1), t: "RoundStarted" as const, dealerId: "alice" };
+        const third = { ...buildEvent(2), t: "RoundStarted" as const, dealerId: "bob" };
+        await repo.appendEvents("game-1", [first, second, third], 0);
+
+        await repo.truncateEvents("game-1", 1);
+
+        await expect(repo.loadEvents("game-1")).resolves.toEqual([first]);
+      });
+
+      it("is a no-op when toVersion is at or past the current length", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        const first = buildEvent(0);
+        await repo.appendEvents("game-1", [first], 0);
+
+        await repo.truncateEvents("game-1", 5);
+
+        await expect(repo.loadEvents("game-1")).resolves.toEqual([first]);
+      });
+
+      it("drops a snapshot at or after the truncated version", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        await repo.appendEvents("game-1", [buildEvent(0), buildEvent(1)], 0);
+        await repo.saveSnapshot("game-1", 2, initialState);
+
+        await repo.truncateEvents("game-1", 1);
+
+        await expect(repo.loadSnapshot("game-1")).resolves.toBeNull();
+      });
+
+      it("keeps a snapshot taken before the truncated version", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        await repo.appendEvents("game-1", [buildEvent(0), buildEvent(1)], 0);
+        await repo.saveSnapshot("game-1", 1, initialState);
+
+        await repo.truncateEvents("game-1", 2);
+
+        await expect(repo.loadSnapshot("game-1")).resolves.toMatchObject({ version: 1 });
+      });
+    });
+
     describe("snapshots", () => {
       it("returns null when no snapshot has been saved", async () => {
         await repo.createGame(buildMeta("game-1"));
@@ -166,9 +210,10 @@ export function runRepositoryContractTests(makeRepo: () => GameRepository): void
     });
 
     describe("unknown games", () => {
-      it("rejects loadEvents, appendEvents, saveSnapshot and loadSnapshot for a game that was never created", async () => {
+      it("rejects loadEvents, appendEvents, truncateEvents, saveSnapshot and loadSnapshot for a game that was never created", async () => {
         await expect(repo.loadEvents("missing")).rejects.toThrow();
         await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow();
+        await expect(repo.truncateEvents("missing", 0)).rejects.toThrow();
         await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow();
         await expect(repo.loadSnapshot("missing")).rejects.toThrow();
       });
