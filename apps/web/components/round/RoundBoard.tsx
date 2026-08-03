@@ -7,6 +7,7 @@ import { nextDealerId } from "@/lib/turnOrder";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardPicker } from "./CardPicker";
+import { FlipThreeSequence } from "./FlipThreeSequence";
 import { PlayerLane } from "./PlayerLane";
 import { useCurrentPlayer } from "./useCurrentPlayer";
 
@@ -92,6 +93,18 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     }
   }
 
+  async function handleForcedDraw(playerId: PlayerId, card: Card) {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch([{ t: "CardDealt", playerId, card }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleCloseRound() {
     if (!round) return;
     setActionError(null);
@@ -148,7 +161,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             }
           />
         ) : pending?.kind === "forced-draw-remaining" ? (
-          <p className="text-muted-foreground text-center text-sm">Flip Three in progress…</p>
+          <FlipThreeSequence
+            resolution={pending}
+            upNext={round.pendingResolutions.slice(1)}
+            round={round}
+            players={state.players}
+            busy={busy}
+            onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
+          />
         ) : roundOver ? (
           <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
             Close round &amp; deal next
