@@ -8,6 +8,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { GameAlreadyExistsError, GameNotFoundError } from "../errors.js";
 import { InMemoryGameRepository } from "../inMemoryGameRepository.js";
+import { runRepositoryContractTests } from "../testing/repositoryContract.js";
+
+runRepositoryContractTests(() => new InMemoryGameRepository());
 
 function buildMeta(id = "game-1"): GameMeta {
   return {

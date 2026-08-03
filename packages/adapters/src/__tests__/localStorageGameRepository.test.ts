@@ -13,6 +13,7 @@ import {
   StorageUnavailableError,
 } from "../errors.js";
 import { LocalStorageGameRepository } from "../localStorageGameRepository.js";
+import { runRepositoryContractTests } from "../testing/repositoryContract.js";
 
 class FakeStorage implements Storage {
   #store = new Map<string, string>();
@@ -70,6 +71,11 @@ function buildGameCreatedEvent(seq = 0): GameCreatedEvent {
     players: buildMeta().players,
   };
 }
+
+runRepositoryContractTests(() => {
+  vi.stubGlobal("window", { localStorage: new FakeStorage() });
+  return new LocalStorageGameRepository();
+});
 
 describe("LocalStorageGameRepository", () => {
   let repo: LocalStorageGameRepository;
