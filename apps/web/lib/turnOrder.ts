@@ -18,6 +18,19 @@ export function seatOrderFromDealer(
 }
 
 /**
+ * The seat one place left of `dealerId`, for starting the next round —
+ * mirrors the rotation `RoundStarted` itself enforces in
+ * `packages/engine/src/reducers/roundStarted.ts`, so the "start next round"
+ * control always proposes a dealer the reducer will accept.
+ */
+export function nextDealerId(players: readonly Player[], dealerId: PlayerId): PlayerId | null {
+  const index = players.findIndex((player) => player.id === dealerId);
+  if (index === -1) return null;
+  const next = players[(index + 1) % players.length];
+  return next?.id ?? null;
+}
+
+/**
  * The first active player at or after `from` in `seatOrder`, wrapping once.
  * `-1` if nobody in the round is active.
  */
