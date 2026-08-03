@@ -3,9 +3,11 @@
 import { isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
 import { useState } from "react";
 
+import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { nextDealerId } from "@/lib/turnOrder";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
+import { CardCorrectionDialog } from "./CardCorrectionDialog";
 import { CardPicker } from "./CardPicker";
 import { FlipThreeSequence } from "./FlipThreeSequence";
 import { InitialDeal } from "./InitialDeal";
@@ -30,7 +32,7 @@ function errorMessage(error: unknown): string {
  * is pending — this pass wires the normal hit-or-stay loop and round close.
  */
 export function RoundBoard({ game }: { readonly game: ReadyGame }) {
-  const { state, dispatch } = game;
+  const { state, events, dispatch, correctCard } = game;
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
     round,
@@ -40,6 +42,12 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const [showPicker, setShowPicker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [correctionTarget, setCorrectionTarget] = useState<{
+    readonly playerId: PlayerId;
+    readonly card: Card;
+  } | null>(null);
+  const [correctionBusy, setCorrectionBusy] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
 
   if (!round) {
     return (
@@ -61,6 +69,13 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     (player) => round.players[player.id]?.status === "flipped7",
   );
   const initialDealTargetId = initialDeal.nextSeatId;
+  const correctionEvent = correctionTarget
+    ? findCardDealtEvent(events, correctionTarget.playerId, correctionTarget.card)
+    : null;
+  const correctionPlayerName = correctionTarget
+    ? (state.players.find((player) => player.id === correctionTarget.playerId)?.name ??
+      correctionTarget.playerId)
+    : "";
 
   async function handleHitDeal(card: Card) {
     if (!currentPlayerId) return;
@@ -130,6 +145,34 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     }
   }
 
+  async function handleRemoveCard() {
+    if (!correctionEvent) return;
+    setCorrectionError(null);
+    setCorrectionBusy(true);
+    try {
+      await correctCard(correctionEvent, null);
+      setCorrectionTarget(null);
+    } catch (error) {
+      setCorrectionError(errorMessage(error));
+    } finally {
+      setCorrectionBusy(false);
+    }
+  }
+
+  async function handleReplaceCard(card: Card) {
+    if (!correctionEvent) return;
+    setCorrectionError(null);
+    setCorrectionBusy(true);
+    try {
+      await correctCard(correctionEvent, card);
+      setCorrectionTarget(null);
+    } catch (error) {
+      setCorrectionError(errorMessage(error));
+    } finally {
+      setCorrectionBusy(false);
+    }
+  }
+
   async function handleCloseRound() {
     if (!round) return;
     setActionError(null);
@@ -175,6 +218,10 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               isDealer={player.id === round.dealerId}
               isCurrentPlayer={player.id === currentPlayerId}
               onSelect={() => selectPlayer(player.id)}
+              onLongPressCard={(card) => {
+                setCorrectionError(null);
+                setCorrectionTarget({ playerId: player.id, card });
+              }}
             />
           );
         })}
@@ -259,6 +306,20 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           <p className="text-muted-foreground text-center text-sm">Waiting for an active player…</p>
         )}
       </div>
+
+      {correctionTarget && correctionEvent && (
+        <CardCorrectionDialog
+          target={correctionEvent}
+          playerName={correctionPlayerName}
+          round={round}
+          playerCount={state.players.length}
+          busy={correctionBusy}
+          error={correctionError}
+          onRemove={() => void handleRemoveCard()}
+          onReplace={(card) => void handleReplaceCard(card)}
+          onCancel={() => setCorrectionTarget(null)}
+        />
+      )}
     </div>
   );
 }

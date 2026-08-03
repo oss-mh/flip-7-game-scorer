@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
-import { CardTile } from "./CardTile";
+import { DealtCardTile } from "./DealtCardTile";
 import { StatusBadge } from "./StatusBadge";
 
-import type { Player, PlayerRoundState } from "@flip-7/engine";
+import type { Card, Player, PlayerRoundState } from "@flip-7/engine";
 
 /** How long the "used it!" treatment stays up after a Second Chance saves a bust — #72. */
 const SECOND_CHANCE_SAVE_DISPLAY_MS = 1600;
@@ -26,12 +26,15 @@ export function PlayerLane({
   isDealer,
   isCurrentPlayer,
   onSelect,
+  onLongPressCard,
 }: {
   readonly player: Player;
   readonly playerRound: PlayerRoundState;
   readonly isDealer: boolean;
   readonly isCurrentPlayer: boolean;
   readonly onSelect: () => void;
+  /** Mistap correction (#74) — long-press a dealt card to remove or replace it. */
+  readonly onLongPressCard?: (card: Card) => void;
 }) {
   const score = scoreRound(playerRound);
   const isBusted = playerRound.status === "busted";
@@ -108,7 +111,13 @@ export function PlayerLane({
       {playerRound.modifierCards.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {playerRound.modifierCards.map((card) => (
-            <CardTile key={card.id} kind="modifier" label={faceLabel(faceOfCard(card))} />
+            <DealtCardTile
+              key={card.id}
+              kind="modifier"
+              label={faceLabel(faceOfCard(card))}
+              onLongPress={() => onLongPressCard?.(card)}
+              disabled={!onLongPressCard}
+            />
           ))}
         </div>
       )}
@@ -116,11 +125,13 @@ export function PlayerLane({
       <div className="flex flex-wrap gap-1">
         {hasCards ? (
           playerRound.numberCards.map((card) => (
-            <CardTile
+            <DealtCardTile
               key={card.id}
               kind="number"
               label={faceLabel(faceOfCard(card))}
               muted={isBusted}
+              onLongPress={() => onLongPressCard?.(card)}
+              disabled={!onLongPressCard}
             />
           ))
         ) : (
