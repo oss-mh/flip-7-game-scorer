@@ -8,8 +8,10 @@ import { nextDealerId } from "@/lib/turnOrder";
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardPicker } from "./CardPicker";
 import { FlipThreeSequence } from "./FlipThreeSequence";
+import { InitialDeal } from "./InitialDeal";
 import { PlayerLane } from "./PlayerLane";
 import { useCurrentPlayer } from "./useCurrentPlayer";
+import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
 import type { ActionCard, Card, PlayerId } from "@flip-7/engine";
@@ -34,6 +36,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     round,
     state.players,
   );
+  const initialDeal = useInitialDeal(round, state.players);
   const [showPicker, setShowPicker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -57,6 +60,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const flipped7Player = state.players.find(
     (player) => round.players[player.id]?.status === "flipped7",
   );
+  const initialDealTargetId = initialDeal.nextSeatId;
 
   async function handleHitDeal(card: Card) {
     if (!currentPlayerId) return;
@@ -106,6 +110,19 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setBusy(true);
     try {
       await dispatch([{ t: "CardDealt", playerId, card }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleInitialDeal(playerId: PlayerId, card: Card) {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch([{ t: "CardDealt", playerId, card }]);
+      initialDeal.markDealt(playerId);
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -185,6 +202,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             players={state.players}
             busy={busy}
             onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
+          />
+        ) : initialDeal.active && initialDealTargetId ? (
+          <InitialDeal
+            round={round}
+            players={state.players}
+            targetPlayerId={initialDealTargetId}
+            busy={busy}
+            onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
+            onSkip={initialDeal.skip}
           />
         ) : roundOver ? (
           <div className="flex flex-col items-center gap-2">
