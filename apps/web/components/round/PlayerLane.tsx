@@ -72,7 +72,10 @@ export function PlayerLane({
           type="button"
           onClick={onSelect}
           aria-pressed={isCurrentPlayer}
-          className="min-h-0! min-w-0! rounded px-1 py-0.5 text-left font-medium"
+          className={[
+            "min-h-0! min-w-0! rounded px-1 py-0.5 text-left font-medium",
+            isBusted ? "text-status-busted line-through" : "",
+          ].join(" ")}
         >
           {player.name}
           {isDealer && (

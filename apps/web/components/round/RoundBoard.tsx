@@ -52,6 +52,11 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const unusedSecondChanceHolders = state.players
     .filter((player) => round.players[player.id]?.heldSecondChance)
     .map((player) => player.name);
+  // Flip 7 ends the round for everyone, so it gets a shared, round-level
+  // celebration rather than only a per-lane treatment — #73.
+  const flipped7Player = state.players.find(
+    (player) => round.players[player.id]?.status === "flipped7",
+  );
 
   async function handleHitDeal(card: Card) {
     if (!currentPlayerId) return;
@@ -131,6 +136,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         <h1 className="text-xl font-semibold tracking-tight">Round {round.roundNumber}</h1>
         <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
       </div>
+
+      {flipped7Player && (
+        <p
+          role="status"
+          className="border-status-flipped7 bg-status-flipped7/10 text-status-flipped7 animate-pulse rounded-lg border-2 p-2 text-center font-semibold"
+        >
+          ★ {flipped7Player.name} flipped 7! Round over for everyone. ★
+        </p>
+      )}
 
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {state.players.map((player) => {
