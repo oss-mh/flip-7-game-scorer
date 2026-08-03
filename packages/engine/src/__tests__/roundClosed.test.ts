@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createActionCard, createNumberCard } from "../cards.js";
 import { DomainError } from "../errors.js";
-import { EVENT_SCHEMA_VERSION, type GameEvent } from "../events.js";
-import { fold } from "../reduce.js";
+import { EVENT_SCHEMA_VERSION, type ActionTargetedEvent, type GameEvent } from "../events.js";
+import { fold, reduce } from "../reduce.js";
 import { isRoundOver } from "../selectors.js";
 
 let seq = 0;
@@ -48,8 +48,29 @@ function secondChanceDealt(playerId: string, copyIndex = 1): GameEvent {
   };
 }
 
+function freezeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return { ...envelope(), t: "CardDealt", playerId, card: createActionCard("freeze", copyIndex) };
+}
+
+function flipThreeDealt(playerId: string, copyIndex = 1): GameEvent {
+  return {
+    ...envelope(),
+    t: "CardDealt",
+    playerId,
+    card: createActionCard("flipThree", copyIndex),
+  };
+}
+
 function playerStayed(playerId: string): GameEvent {
   return { ...envelope(), t: "PlayerStayed", playerId };
+}
+
+function actionTargeted(
+  card: ReturnType<typeof createActionCard>,
+  sourceId: string,
+  targetId: string,
+): ActionTargetedEvent {
+  return { ...envelope(), t: "ActionTargeted", card, sourceId, targetId };
 }
 
 function roundClosed(): GameEvent {
@@ -176,4 +197,71 @@ describe("RoundClosed", () => {
     const state = fold(events);
     expect(state.currentRound?.players["alice"]?.heldSecondChance).toBeNull();
   });
+
+  it("discards a dangling resolution that outlived every active player (#95)", () => {
+    // Alice is the sole active player (bob and carol already stayed) and
+    // draws a Flip Three whose forced three reveal two nested Freezes.
+    // Resolving the first Freeze forces alice to target herself (she's
+    // the only active player left), which freezes her — ending the round
+    // with the *second* Freeze still queued behind it and now permanently
+    // unresolvable: nobody, including alice, is active anymore, so no
+    // ActionTargeted event could ever validate a target for it.
+    const three = [
+      gameCreated3(),
+      roundStarted("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      cardDealt("carol", 7),
+      playerStayed("carol"),
+      flipThreeDealt("alice"),
+      freezeDealt("alice", 1),
+      freezeDealt("alice", 2),
+      cardDealt("alice", 9),
+    ];
+    const dealt = fold(three);
+    expect(dealt.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: createActionCard("freeze", 1), sourcePlayerId: "alice" },
+      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "alice" },
+    ]);
+
+    const frozen = reduce(dealt, actionTargeted(createActionCard("freeze", 1), "alice", "alice"));
+    expect(frozen.currentRound?.players["alice"]?.status).toBe("frozen");
+    // The bug: the second Freeze is still sitting there, unresolvable.
+    expect(frozen.currentRound?.pendingResolutions).toEqual([
+      { kind: "awaiting-target", card: createActionCard("freeze", 2), sourcePlayerId: "alice" },
+    ]);
+
+    const closed = reduce(frozen, roundClosed());
+    expect(closed.currentRound?.pendingResolutions).toEqual([]);
+
+    // And it's gone for good — nothing can resolve it after the round closed.
+    expect(() =>
+      reduce(closed, actionTargeted(createActionCard("freeze", 2), "alice", "alice")),
+    ).toThrow(DomainError);
+  });
+
+  it("leaves an empty queue empty, as the common case", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      roundClosed(),
+    ];
+    const state = fold(events);
+    expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
 });
+
+function gameCreated3(): GameEvent {
+  return {
+    ...envelope(),
+    t: "GameCreated",
+    players: [
+      { id: "alice", name: "Alice" },
+      { id: "bob", name: "Bob" },
+      { id: "carol", name: "Carol" },
+    ],
+  };
+}

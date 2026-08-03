@@ -36,9 +36,17 @@ export function applyRoundClosed(state: GameState): GameState {
       : playerRoundState;
   }
 
+  // Any resolution still queued here is permanently unresolvable, not just
+  // stale: every kind — awaiting-target, forced-draw-remaining — needs at
+  // least one active player to proceed (a target to validate, a player to
+  // deal to), and isRoundOver just confirmed there are none. This can
+  // happen when a Freeze nested behind another one ends up with nobody
+  // left to target once the first Freeze takes the last active player out
+  // — see #95. Discarding it here isn't a rules call, it's clearing out
+  // something that could never legitimately resolve.
   return {
     ...state,
     cumulativeScores,
-    currentRound: { ...round, players },
+    currentRound: { ...round, players, pendingResolutions: [] },
   };
 }
