@@ -21,6 +21,7 @@ function buildMeta(id = "game-1"): GameMeta {
     ],
     targetScore: 200,
     createdAt: "2026-08-03T00:00:00.000Z",
+    archivedAt: null,
   };
 }
 
@@ -58,11 +59,16 @@ describe("InMemoryGameRepository", () => {
     await expect(repo.createGame(buildMeta("game-1"))).rejects.toThrow(GameAlreadyExistsError);
   });
 
-  it("rejects loading events, appending, snapshotting or deleting from an unknown game", async () => {
+  it("rejects loading events, appending, truncating, snapshotting, archiving or deleting from an unknown game", async () => {
     await expect(repo.loadEvents("missing")).rejects.toThrow(GameNotFoundError);
     await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow(GameNotFoundError);
+    await expect(repo.truncateEvents("missing", 0)).rejects.toThrow(GameNotFoundError);
     await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow(GameNotFoundError);
     await expect(repo.loadSnapshot("missing")).rejects.toThrow(GameNotFoundError);
+    await expect(repo.archiveGame("missing", "2026-08-03T00:00:00.000Z")).rejects.toThrow(
+      GameNotFoundError,
+    );
+    await expect(repo.unarchiveGame("missing")).rejects.toThrow(GameNotFoundError);
   });
 
   it("starts with an empty event log", async () => {

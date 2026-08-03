@@ -14,6 +14,14 @@ export interface GameMeta {
   readonly players: readonly Player[];
   readonly targetScore: number;
   readonly createdAt: string;
+  /**
+   * When this game was archived, or `null` if it isn't. Archiving is app
+   * bookkeeping, not something that happened at the table, so it lives here
+   * rather than as a domain event — see AGENTS.md, "Events record what
+   * happened, not what it means". An archived game stays in storage (still
+   * available for stats) but is hidden from the default games list.
+   */
+  readonly archivedAt: string | null;
 }
 
 export type StoredEvent = GameEvent;
@@ -49,7 +57,22 @@ export interface GameRepository {
     events: readonly GameEvent[],
     expectedVersion: number,
   ): Promise<AppendResult>;
+  /**
+   * Drops every event from `toVersion` onward, keeping `[0, toVersion)`. The
+   * one sanctioned way to shrink the log — see AGENTS.md invariant #4, "The
+   * event log is append-only": corrections are new events, or this explicit
+   * truncation, never an in-place edit or delete of a stored event. Used by
+   * undo, which is otherwise a plain client-side operation. A stored
+   * snapshot taken at or after `toVersion` is no longer a valid prefix of
+   * the truncated log and must be dropped along with the events; one taken
+   * before `toVersion` is still valid and is left alone.
+   */
+  truncateEvents(gameId: GameId, toVersion: number): Promise<void>;
   saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void>;
   loadSnapshot(gameId: GameId): Promise<Snapshot | null>;
+  /** Hides a game from the default games list without deleting its data. */
+  archiveGame(gameId: GameId, archivedAt: string): Promise<void>;
+  /** Reverses `archiveGame` — archiving is never a one-way trap. */
+  unarchiveGame(gameId: GameId): Promise<void>;
   deleteGame(gameId: GameId): Promise<void>;
 }

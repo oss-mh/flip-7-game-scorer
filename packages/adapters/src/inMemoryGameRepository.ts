@@ -59,12 +59,30 @@ export class InMemoryGameRepository implements GameRepository {
     return { outcome: "appended", version: game.events.length };
   }
 
+  async truncateEvents(gameId: GameId, toVersion: number): Promise<void> {
+    const game = this.#require(gameId);
+    game.events = game.events.slice(0, toVersion);
+    if (game.snapshot !== null && game.snapshot.version >= toVersion) {
+      game.snapshot = null;
+    }
+  }
+
   async saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void> {
     this.#require(gameId).snapshot = { version, schemaVersion: EVENT_SCHEMA_VERSION, state };
   }
 
   async loadSnapshot(gameId: GameId): Promise<Snapshot | null> {
     return this.#require(gameId).snapshot;
+  }
+
+  async archiveGame(gameId: GameId, archivedAt: string): Promise<void> {
+    const game = this.#require(gameId);
+    game.meta = { ...game.meta, archivedAt };
+  }
+
+  async unarchiveGame(gameId: GameId): Promise<void> {
+    const game = this.#require(gameId);
+    game.meta = { ...game.meta, archivedAt: null };
   }
 
   async deleteGame(gameId: GameId): Promise<void> {

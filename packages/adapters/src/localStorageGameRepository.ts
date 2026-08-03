@@ -168,6 +168,19 @@ export class LocalStorageGameRepository implements GameRepository {
     return { outcome: "appended", version: updated.length };
   }
 
+  async truncateEvents(gameId: GameId, toVersion: number): Promise<void> {
+    const storage = getStorage();
+    this.#requireGame(storage, gameId);
+
+    const existing = readJsonArray<StoredEvent>(storage, eventsKey(gameId));
+    writeJson(storage, eventsKey(gameId), existing.slice(0, toVersion));
+
+    const snapshot = readJsonObject<Snapshot>(storage, snapshotKey(gameId));
+    if (snapshot !== null && snapshot.version >= toVersion) {
+      storage.removeItem(snapshotKey(gameId));
+    }
+  }
+
   async saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void> {
     const storage = getStorage();
     this.#requireGame(storage, gameId);
@@ -182,6 +195,14 @@ export class LocalStorageGameRepository implements GameRepository {
     const storage = getStorage();
     this.#requireGame(storage, gameId);
     return readJsonObject<Snapshot>(storage, snapshotKey(gameId));
+  }
+
+  async archiveGame(gameId: GameId, archivedAt: string): Promise<void> {
+    this.#updateMeta(getStorage(), gameId, (meta) => ({ ...meta, archivedAt }));
+  }
+
+  async unarchiveGame(gameId: GameId): Promise<void> {
+    this.#updateMeta(getStorage(), gameId, (meta) => ({ ...meta, archivedAt: null }));
   }
 
   async deleteGame(gameId: GameId): Promise<void> {
@@ -201,5 +222,16 @@ export class LocalStorageGameRepository implements GameRepository {
     if (!games.some((game) => game.id === gameId)) {
       throw new GameNotFoundError(gameId);
     }
+  }
+
+  #updateMeta(storage: Storage, gameId: GameId, update: (meta: GameMeta) => GameMeta): void {
+    const games = readJsonArray<GameMeta>(storage, gamesIndexKey());
+    const existing = games.find((game) => game.id === gameId);
+    if (!existing) {
+      throw new GameNotFoundError(gameId);
+    }
+
+    const updated = games.map((game) => (game.id === gameId ? update(existing) : game));
+    writeJson(storage, gamesIndexKey(), updated);
   }
 }

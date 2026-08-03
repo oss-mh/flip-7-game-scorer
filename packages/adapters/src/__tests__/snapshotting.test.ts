@@ -19,7 +19,7 @@ const PLAYERS = [
 ];
 
 function meta(id = "game-1"): GameMeta {
-  return { id, players: PLAYERS, targetScore: 200, createdAt: AT };
+  return { id, players: PLAYERS, targetScore: 200, createdAt: AT, archivedAt: null };
 }
 
 /** A long but entirely legal 2-player game: each round, both players take one card and stay. */
@@ -111,12 +111,15 @@ describe("loadGameState", () => {
       listGames: async () => [],
       loadEvents,
       appendEvents: async () => ({ outcome: "appended", version: events.length }),
+      truncateEvents: async () => {},
       saveSnapshot: async () => {},
       loadSnapshot: async () => ({
         version: 10,
         schemaVersion: 999,
         state: fold(events.slice(0, 10)),
       }),
+      archiveGame: async () => {},
+      unarchiveGame: async () => {},
       deleteGame: async () => {},
     };
 
