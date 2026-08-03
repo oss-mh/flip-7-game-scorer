@@ -116,6 +116,7 @@ export default function NewGamePage() {
         players: finalPlayers,
         targetScore,
         createdAt: at,
+        archivedAt: null,
       });
 
       const gameCreated: GameCreatedEvent = {

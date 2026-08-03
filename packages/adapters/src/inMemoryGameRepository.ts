@@ -75,6 +75,16 @@ export class InMemoryGameRepository implements GameRepository {
     return this.#require(gameId).snapshot;
   }
 
+  async archiveGame(gameId: GameId, archivedAt: string): Promise<void> {
+    const game = this.#require(gameId);
+    game.meta = { ...game.meta, archivedAt };
+  }
+
+  async unarchiveGame(gameId: GameId): Promise<void> {
+    const game = this.#require(gameId);
+    game.meta = { ...game.meta, archivedAt: null };
+  }
+
   async deleteGame(gameId: GameId): Promise<void> {
     this.#games.delete(gameId);
   }

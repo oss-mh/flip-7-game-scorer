@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 
 import { GameRepositoryProvider } from "@/lib/gameRepositoryContext";
 
@@ -35,8 +36,11 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <GameRepositoryProvider>
-          <header className="border-b border-border px-4 py-3">
-            <span className="text-lg font-semibold tracking-tight">Flip 7 Scorekeeper</span>
+          <header className="flex items-center justify-between border-b border-border px-4 py-3">
+            <Link href="/" className="text-lg font-semibold tracking-tight">
+              Flip 7 Scorekeeper
+            </Link>
+            <Link href="/settings">Settings</Link>
           </header>
           <main className="flex flex-1 flex-col">{children}</main>
         </GameRepositoryProvider>

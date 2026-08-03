@@ -12,6 +12,7 @@ function buildMeta(id: string): GameMeta {
     ],
     targetScore: 200,
     createdAt: "2026-01-01T00:00:00.000Z",
+    archivedAt: null,
   };
 }
 
@@ -195,6 +196,40 @@ export function runRepositoryContractTests(makeRepo: () => GameRepository): void
       });
     });
 
+    describe("archiving", () => {
+      it("sets archivedAt without touching anything else", async () => {
+        const meta = buildMeta("game-1");
+        await repo.createGame(meta);
+
+        await repo.archiveGame("game-1", "2026-01-02T00:00:00.000Z");
+
+        await expect(repo.listGames()).resolves.toEqual([
+          { ...meta, archivedAt: "2026-01-02T00:00:00.000Z" },
+        ]);
+      });
+
+      it("reverses archiving back to archivedAt: null", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        await repo.archiveGame("game-1", "2026-01-02T00:00:00.000Z");
+
+        await repo.unarchiveGame("game-1");
+
+        const games = await repo.listGames();
+        expect(games).toEqual([{ ...buildMeta("game-1"), archivedAt: null }]);
+      });
+
+      it("leaves other games untouched when archiving one", async () => {
+        await repo.createGame(buildMeta("game-1"));
+        await repo.createGame(buildMeta("game-2"));
+
+        await repo.archiveGame("game-1", "2026-01-02T00:00:00.000Z");
+
+        const games = await repo.listGames();
+        const other = games.find((game) => game.id === "game-2");
+        expect(other).toEqual(buildMeta("game-2"));
+      });
+    });
+
     describe("deletion", () => {
       it("removes a game from listGames", async () => {
         await repo.createGame(buildMeta("game-1"));
@@ -210,12 +245,14 @@ export function runRepositoryContractTests(makeRepo: () => GameRepository): void
     });
 
     describe("unknown games", () => {
-      it("rejects loadEvents, appendEvents, truncateEvents, saveSnapshot and loadSnapshot for a game that was never created", async () => {
+      it("rejects loadEvents, appendEvents, truncateEvents, saveSnapshot, loadSnapshot, archiveGame and unarchiveGame for a game that was never created", async () => {
         await expect(repo.loadEvents("missing")).rejects.toThrow();
         await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow();
         await expect(repo.truncateEvents("missing", 0)).rejects.toThrow();
         await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow();
         await expect(repo.loadSnapshot("missing")).rejects.toThrow();
+        await expect(repo.archiveGame("missing", "2026-01-01T00:00:00.000Z")).rejects.toThrow();
+        await expect(repo.unarchiveGame("missing")).rejects.toThrow();
       });
     });
   });

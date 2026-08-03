@@ -14,6 +14,14 @@ export interface GameMeta {
   readonly players: readonly Player[];
   readonly targetScore: number;
   readonly createdAt: string;
+  /**
+   * When this game was archived, or `null` if it isn't. Archiving is app
+   * bookkeeping, not something that happened at the table, so it lives here
+   * rather than as a domain event — see AGENTS.md, "Events record what
+   * happened, not what it means". An archived game stays in storage (still
+   * available for stats) but is hidden from the default games list.
+   */
+  readonly archivedAt: string | null;
 }
 
 export type StoredEvent = GameEvent;
@@ -62,5 +70,9 @@ export interface GameRepository {
   truncateEvents(gameId: GameId, toVersion: number): Promise<void>;
   saveSnapshot(gameId: GameId, version: number, state: GameState): Promise<void>;
   loadSnapshot(gameId: GameId): Promise<Snapshot | null>;
+  /** Hides a game from the default games list without deleting its data. */
+  archiveGame(gameId: GameId, archivedAt: string): Promise<void>;
+  /** Reverses `archiveGame` — archiving is never a one-way trap. */
+  unarchiveGame(gameId: GameId): Promise<void>;
   deleteGame(gameId: GameId): Promise<void>;
 }

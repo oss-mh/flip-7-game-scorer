@@ -197,6 +197,14 @@ export class LocalStorageGameRepository implements GameRepository {
     return readJsonObject<Snapshot>(storage, snapshotKey(gameId));
   }
 
+  async archiveGame(gameId: GameId, archivedAt: string): Promise<void> {
+    this.#updateMeta(getStorage(), gameId, (meta) => ({ ...meta, archivedAt }));
+  }
+
+  async unarchiveGame(gameId: GameId): Promise<void> {
+    this.#updateMeta(getStorage(), gameId, (meta) => ({ ...meta, archivedAt: null }));
+  }
+
   async deleteGame(gameId: GameId): Promise<void> {
     const storage = getStorage();
     const games = readJsonArray<GameMeta>(storage, gamesIndexKey());
@@ -214,5 +222,16 @@ export class LocalStorageGameRepository implements GameRepository {
     if (!games.some((game) => game.id === gameId)) {
       throw new GameNotFoundError(gameId);
     }
+  }
+
+  #updateMeta(storage: Storage, gameId: GameId, update: (meta: GameMeta) => GameMeta): void {
+    const games = readJsonArray<GameMeta>(storage, gamesIndexKey());
+    const existing = games.find((game) => game.id === gameId);
+    if (!existing) {
+      throw new GameNotFoundError(gameId);
+    }
+
+    const updated = games.map((game) => (game.id === gameId ? update(existing) : game));
+    writeJson(storage, gamesIndexKey(), updated);
   }
 }

@@ -59,6 +59,7 @@ function buildMeta(id = "game-1"): GameMeta {
     ],
     targetScore: 200,
     createdAt: "2026-08-03T00:00:00.000Z",
+    archivedAt: null,
   };
 }
 
@@ -117,12 +118,32 @@ describe("LocalStorageGameRepository", () => {
     await expect(repo.createGame(buildMeta("game-1"))).rejects.toThrow(GameAlreadyExistsError);
   });
 
-  it("rejects loading events, appending, truncating, snapshotting or deleting from an unknown game", async () => {
+  it("rejects loading events, appending, truncating, snapshotting, archiving or deleting from an unknown game", async () => {
     await expect(repo.loadEvents("missing")).rejects.toThrow(GameNotFoundError);
     await expect(repo.appendEvents("missing", [], 0)).rejects.toThrow(GameNotFoundError);
     await expect(repo.truncateEvents("missing", 0)).rejects.toThrow(GameNotFoundError);
     await expect(repo.saveSnapshot("missing", 0, initialState)).rejects.toThrow(GameNotFoundError);
     await expect(repo.loadSnapshot("missing")).rejects.toThrow(GameNotFoundError);
+    await expect(repo.archiveGame("missing", "2026-08-03T00:00:00.000Z")).rejects.toThrow(
+      GameNotFoundError,
+    );
+    await expect(repo.unarchiveGame("missing")).rejects.toThrow(GameNotFoundError);
+  });
+
+  it("archives a game in place within the stored games index", async () => {
+    await repo.createGame(buildMeta());
+
+    await repo.archiveGame("game-1", "2026-08-04T00:00:00.000Z");
+
+    expect(window.localStorage.getItem("flip7:v1:games")).toBe(
+      JSON.stringify([{ ...buildMeta(), archivedAt: "2026-08-04T00:00:00.000Z" }]),
+    );
+
+    await repo.unarchiveGame("game-1");
+
+    expect(window.localStorage.getItem("flip7:v1:games")).toBe(
+      JSON.stringify([buildMeta()]),
+    );
   });
 
   it("appends a batch of events in a single write", async () => {
