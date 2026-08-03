@@ -34,6 +34,14 @@ export type {
 } from "./events.js";
 export { EVENT_SCHEMA_VERSION } from "./events.js";
 export type { Player, PlayerId } from "./player.js";
+export type {
+  AppendResult,
+  GameId,
+  GameMeta,
+  GameRepository,
+  Snapshot,
+  StoredEvent,
+} from "./ports/gameRepository.js";
 export { fold, initialState, reduce } from "./reduce.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
 export { isRoundOver, legalActions, nextResolution } from "./selectors.js";
