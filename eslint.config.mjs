@@ -51,9 +51,12 @@ const DOM_GLOBALS = [
 // alongside it.
 const NON_DETERMINISM_GLOBALS = ["Date", "crypto"];
 
-// packages/* are plain TypeScript with no React/DOM — a lighter rule set
-// than apps/web needs, plus the architectural boundary: the engine must
-// stay pure. See AGENTS.md, "packages/engine stays pure".
+// packages/* are plain TypeScript with no React/Next — apps/web is the only
+// workspace allowed to depend on either. This alone doesn't ban the DOM:
+// packages/adapters (M3) legitimately needs `localStorage`/`window` for its
+// LocalStorage adapter, so the DOM/determinism bans below are scoped more
+// narrowly to packages/engine specifically. See AGENTS.md,
+// "packages/engine stays pure".
 const packagesConfig = defineConfig({
   files: ["packages/**/*.{ts,tsx}"],
   extends: [tseslint.configs.recommended],
@@ -64,29 +67,34 @@ const packagesConfig = defineConfig({
         paths: [
           {
             name: "react",
-            message:
-              "packages/engine is pure domain logic and must never depend on React. See AGENTS.md.",
+            message: "packages/* must never depend on React. See AGENTS.md.",
           },
           {
             name: "react-dom",
-            message:
-              "packages/engine is pure domain logic and must never depend on React. See AGENTS.md.",
+            message: "packages/* must never depend on React. See AGENTS.md.",
           },
           {
             name: "next",
-            message:
-              "packages/engine is pure domain logic and must never depend on Next.js. See AGENTS.md.",
+            message: "packages/* must never depend on Next.js. See AGENTS.md.",
           },
         ],
         patterns: [
           {
             group: ["react/*", "react-dom/*", "next/*"],
-            message:
-              "packages/engine is pure domain logic and must never depend on React or Next.js. See AGENTS.md.",
+            message: "packages/* must never depend on React or Next.js. See AGENTS.md.",
           },
         ],
       },
     ],
+  },
+});
+
+// packages/engine specifically must stay pure: no DOM, no system clock, no
+// system entropy. See AGENTS.md, "packages/engine stays pure" and
+// invariant #2, "No non-determinism in the domain".
+const enginePurityConfig = defineConfig({
+  files: ["packages/engine/**/*.{ts,tsx}"],
+  rules: {
     "no-restricted-globals": [
       "error",
       ...DOM_GLOBALS.map((name) => ({
@@ -182,6 +190,7 @@ export default defineConfig([
   ]),
   importOrder,
   packagesConfig,
+  enginePurityConfig,
   engineTestingDoublesConfig,
   webConfig,
   eslintConfigPrettier,
