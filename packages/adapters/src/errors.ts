@@ -25,3 +25,10 @@ export class StorageUnavailableError extends Error {
     this.name = "StorageUnavailableError";
   }
 }
+
+export class MalformedExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MalformedExportError";
+  }
+}
