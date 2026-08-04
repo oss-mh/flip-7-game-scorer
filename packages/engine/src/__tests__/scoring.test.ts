@@ -20,6 +20,7 @@ function playerRound(overrides: Partial<PlayerRoundState>): PlayerRoundState {
     modifierCards: [],
     heldSecondChance: null,
     status: "stayed",
+    manualScore: null,
     ...overrides,
   };
 }
@@ -93,6 +94,21 @@ describe("scoreRound", () => {
   it("scores a lone flat modifier at its face value", () => {
     const round = playerRound({ modifierCards: [createModifierCard(6, 1)] });
     expect(scoreRound(round).total).toBe(6);
+  });
+
+  it("scores a manually entered player by the entered points, ignoring any cards", () => {
+    const round = playerRound({
+      status: "manual",
+      manualScore: 23,
+      numberCards: [createNumberCard(9, 1)],
+    });
+    expect(scoreRound(round)).toEqual({
+      base: 23,
+      multiplier: 1,
+      flatBonus: 0,
+      flip7Bonus: 0,
+      total: 23,
+    });
   });
 
   it("scores a busted player 0 regardless of cards held", () => {

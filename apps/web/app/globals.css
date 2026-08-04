@@ -24,6 +24,7 @@
   --status-busted: #f87171;
   --status-frozen: #22d3ee;
   --status-flipped7: #fbbf24;
+  --status-manual: #818cf8;
 
   /* WCAG 2.5.5 minimum tap target size. */
   --touch-target: 2.75rem;
@@ -45,6 +46,7 @@
   --color-status-busted: var(--status-busted);
   --color-status-frozen: var(--status-frozen);
   --color-status-flipped7: var(--status-flipped7);
+  --color-status-manual: var(--status-manual);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

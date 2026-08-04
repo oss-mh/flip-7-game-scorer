@@ -20,6 +20,11 @@ export function scoreRound(playerRound: PlayerRoundState): ScoreBreakdown {
     return { base: 0, multiplier: 1, flatBonus: 0, flip7Bonus: 0, total: 0 };
   }
 
+  if (playerRound.status === "manual") {
+    const total = playerRound.manualScore ?? 0;
+    return { base: total, multiplier: 1, flatBonus: 0, flip7Bonus: 0, total };
+  }
+
   const base = playerRound.numberCards.reduce((sum, card) => sum + card.value, 0);
   const hasX2 = playerRound.modifierCards.some((card) => card.modifier === "x2");
   const multiplier = hasX2 ? 2 : 1;

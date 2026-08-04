@@ -10,6 +10,7 @@ const STATUS_META: Record<PlayerRoundStatus, { readonly label: string; readonly 
   busted: { label: "Bust", icon: "✕" },
   frozen: { label: "Frozen", icon: "❄" },
   flipped7: { label: "Flip 7!", icon: "★" },
+  manual: { label: "Manual", icon: "✎" },
 };
 
 const STATUS_CLASSES: Record<PlayerRoundStatus, string> = {
@@ -18,6 +19,7 @@ const STATUS_CLASSES: Record<PlayerRoundStatus, string> = {
   busted: "text-status-busted border-status-busted/60",
   frozen: "text-status-frozen border-status-frozen/60",
   flipped7: "text-status-flipped7 border-status-flipped7 animate-pulse",
+  manual: "text-status-manual border-status-manual/60",
 };
 
 export function StatusBadge({ status }: { readonly status: PlayerRoundStatus }) {

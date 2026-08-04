@@ -4,8 +4,10 @@ import type { Player, PlayerId } from "./player.js";
 /**
  * `flipped7` and `busted` are derived by the reducer from `CardDealt`, never
  * stored as their own events — see AGENTS.md §"Events record what happened".
+ * `manual` mirrors `ManualScoreEntered` directly, the same way `stayed`
+ * mirrors `PlayerStayed`.
  */
-export type PlayerRoundStatus = "active" | "stayed" | "busted" | "frozen" | "flipped7";
+export type PlayerRoundStatus = "active" | "stayed" | "busted" | "frozen" | "flipped7" | "manual";
 
 export interface PlayerRoundState {
   readonly playerId: PlayerId;
@@ -13,6 +15,8 @@ export interface PlayerRoundState {
   readonly modifierCards: readonly ModifierCard[];
   readonly heldSecondChance: ActionCard | null;
   readonly status: PlayerRoundStatus;
+  /** Set by `ManualScoreEntered`; null for every card-tracked player. */
+  readonly manualScore: number | null;
 }
 
 /**

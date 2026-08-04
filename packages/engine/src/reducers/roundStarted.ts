@@ -24,6 +24,7 @@ function freshPlayerRoundState(playerId: PlayerId): PlayerRoundState {
     modifierCards: [],
     heldSecondChance: null,
     status: "active",
+    manualScore: null,
   };
 }
 
