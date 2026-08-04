@@ -14,6 +14,7 @@ import { InitialDeal } from "./InitialDeal";
 import { ManualScoreEntry } from "./ManualScoreEntry";
 import { PlayerLane } from "./PlayerLane";
 import { RoundSummary } from "./RoundSummary";
+import { Scoreboard } from "./Scoreboard";
 import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
@@ -59,6 +60,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     }
   }, [round]);
   const [busy, setBusy] = useState(false);
+  const [showScoreboard, setShowScoreboard] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [correctionTarget, setCorrectionTarget] = useState<{
     readonly playerId: PlayerId;
@@ -252,7 +254,16 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     <div className="flex flex-1 flex-col gap-4 p-3">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Round {round.roundNumber}</h1>
-        <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+            onClick={() => setShowScoreboard(true)}
+          >
+            Scoreboard
+          </button>
+          <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
+        </div>
       </div>
 
       {flipped7Player && (
@@ -413,6 +424,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           onRemove={() => void handleRemoveCard()}
           onReplace={(card) => void handleReplaceCard(card)}
           onCancel={() => setCorrectionTarget(null)}
+        />
+      )}
+
+      {showScoreboard && (
+        <Scoreboard
+          players={state.players}
+          cumulativeScores={state.cumulativeScores}
+          targetScore={state.targetScore}
+          onClose={() => setShowScoreboard(false)}
         />
       )}
     </div>
