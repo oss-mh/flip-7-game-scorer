@@ -12,6 +12,7 @@ import { CardPicker } from "./CardPicker";
 import { FlipThreeSequence } from "./FlipThreeSequence";
 import { InitialDeal } from "./InitialDeal";
 import { PlayerLane } from "./PlayerLane";
+import { RoundSummary } from "./RoundSummary";
 import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
@@ -30,6 +31,13 @@ function errorMessage(error: unknown): string {
  * (#70), the guided Flip Three sequence (#71) and the initial deal (#75)
  * each take over the controls area below the lanes when their resolution
  * is pending — this pass wires the normal hit-or-stay loop and round close.
+ *
+ * Closing a round and starting the next are separate dispatches (#77): once
+ * `RoundClosed` fires, `round` and `state.cumulativeScores` still describe
+ * the round that just ended (the reducer doesn't clear `currentRound`), so
+ * the summary renders from them until "Continue" dispatches `RoundStarted`.
+ * `justClosed` reads the tail of the event log rather than local state so
+ * the summary survives a reload or an undo mid-review.
  */
 export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const { state, events, dispatch, correctCard } = game;
@@ -59,6 +67,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   const pending = nextResolution(state);
   const roundOver = isRoundOver(state);
+  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   const currentLegal = currentPlayerId ? legalActions(state, currentPlayerId) : null;
   const unusedSecondChanceHolders = state.players
     .filter((player) => round.players[player.id]?.heldSecondChance)
@@ -178,11 +187,22 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setActionError(null);
     setBusy(true);
     try {
-      const dealerId = nextDealerId(state.players, round.dealerId);
-      const commands = dealerId
-        ? [{ t: "RoundClosed" as const }, { t: "RoundStarted" as const, dealerId }]
-        : [{ t: "RoundClosed" as const }];
-      await dispatch(commands);
+      await dispatch([{ t: "RoundClosed" }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStartNextRound() {
+    if (!round) return;
+    const dealerId = nextDealerId(state.players, round.dealerId);
+    if (!dealerId) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch([{ t: "RoundStarted", dealerId }]);
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -259,6 +279,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
             onSkip={initialDeal.skip}
           />
+        ) : justClosed ? (
+          <RoundSummary
+            round={round}
+            players={state.players}
+            cumulativeScores={state.cumulativeScores}
+            busy={busy}
+            onContinue={() => void handleStartNextRound()}
+          />
         ) : roundOver ? (
           <div className="flex flex-col items-center gap-2">
             {unusedSecondChanceHolders.length > 0 && (
@@ -268,7 +296,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               </p>
             )}
             <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
-              Close round &amp; deal next
+              Close round
             </button>
           </div>
         ) : currentPlayerId && currentLegal ? (
