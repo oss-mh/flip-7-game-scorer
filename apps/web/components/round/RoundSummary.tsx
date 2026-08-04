@@ -19,7 +19,11 @@ import type { Player, PlayerId, RoundState } from "@flip-7/engine";
  * invariant #5. When the round that just closed also ended the game (#81 —
  * `gameOver`/`winners` come from the engine's own `status`/`gameWinners`,
  * never re-derived here), the "start next round" action is replaced with
- * final standings and a rematch action instead.
+ * final standings and a rematch action instead. Otherwise the continue
+ * button names the next dealer up front (#82) — the seat one left of this
+ * round's, already the rule `RoundStarted` itself enforces — and, if the
+ * tracked deck has been fully dealt out since the last reshuffle, prompts
+ * for one instead of silently continuing on an empty deck.
  */
 export function RoundSummary({
   round,
@@ -28,6 +32,8 @@ export function RoundSummary({
   busy,
   gameOver,
   winners,
+  nextDealer,
+  deckExhausted,
   onContinue,
   onRematch,
 }: {
@@ -37,6 +43,8 @@ export function RoundSummary({
   readonly busy: boolean;
   readonly gameOver: boolean;
   readonly winners: readonly Player[];
+  readonly nextDealer: Player | null;
+  readonly deckExhausted: boolean;
   readonly onContinue: () => void;
   readonly onRematch: () => void;
 }) {
@@ -103,9 +111,17 @@ export function RoundSummary({
           </button>
         </div>
       ) : (
-        <button type="button" onClick={onContinue} disabled={busy}>
-          Start round {round.roundNumber + 1}
-        </button>
+        <div className="flex flex-col items-center gap-2">
+          {deckExhausted && (
+            <p className="text-card-action text-center text-xs">
+              The tracked deck is exhausted — reshuffling before the next round.
+            </p>
+          )}
+          <button type="button" onClick={onContinue} disabled={busy}>
+            {deckExhausted ? "Reshuffle & start" : "Start"} round {round.roundNumber + 1}
+            {nextDealer && ` — ${nextDealer.name} deals`}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
+import { isDeckExhausted } from "@/lib/deckTracking";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { nextDealerId } from "@/lib/turnOrder";
 
@@ -22,7 +23,7 @@ import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { ActionCard, Card, PlayerId } from "@flip-7/engine";
+import type { ActionCard, Card, Player, PlayerId } from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
@@ -102,6 +103,10 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const gameOver = state.status === "completed";
   const winnerIds = gameWinners(state);
   const winners = state.players.filter((player) => winnerIds.includes(player.id));
+  const nextDealerIdValue = nextDealerId(state.players, round.dealerId);
+  const nextDealer: Player | null =
+    state.players.find((player) => player.id === nextDealerIdValue) ?? null;
+  const deckExhausted = isDeckExhausted(events, state.players.length);
   const correctionEvent = correctionTarget
     ? findCardDealtEvent(events, correctionTarget.playerId, correctionTarget.card)
     : null;
@@ -226,7 +231,10 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setActionError(null);
     setBusy(true);
     try {
-      await dispatch([{ t: "RoundStarted", dealerId }]);
+      const commands = deckExhausted
+        ? [{ t: "DeckReshuffled" as const }, { t: "RoundStarted" as const, dealerId }]
+        : [{ t: "RoundStarted" as const, dealerId }];
+      await dispatch(commands);
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -376,6 +384,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             busy={busy}
             gameOver={gameOver}
             winners={winners}
+            nextDealer={nextDealer}
+            deckExhausted={deckExhausted}
             onContinue={() => void handleStartNextRound()}
             onRematch={() => void handleRematch()}
           />
