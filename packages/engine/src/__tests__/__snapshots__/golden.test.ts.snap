@@ -64,6 +64,7 @@ exports[`golden replay — flip7-bust-and-x2 > folds a round containing a bust, 
     "players": {
       "alice": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [
           {
             "id": "mod-x2-1",
@@ -113,6 +114,7 @@ exports[`golden replay — flip7-bust-and-x2 > folds a round containing a bust, 
       },
       "bob": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {
@@ -188,6 +190,7 @@ exports[`golden replay — three-player-multi-round > folds to the expected fina
     "players": {
       "alice": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {
@@ -201,6 +204,7 @@ exports[`golden replay — three-player-multi-round > folds to the expected fina
       },
       "bob": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {
@@ -219,6 +223,7 @@ exports[`golden replay — three-player-multi-round > folds to the expected fina
       },
       "cara": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {
@@ -292,6 +297,7 @@ exports[`golden replay — two-player-simple > folds to the expected final state
     "players": {
       "alice": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {
@@ -310,6 +316,7 @@ exports[`golden replay — two-player-simple > folds to the expected final state
       },
       "bob": {
         "heldSecondChance": null,
+        "manualScore": null,
         "modifierCards": [],
         "numberCards": [
           {

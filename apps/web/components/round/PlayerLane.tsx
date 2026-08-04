@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
 import { DealtCardTile } from "./DealtCardTile";
+import { ScoreBreakdownLine } from "./ScoreBreakdownLine";
 import { StatusBadge } from "./StatusBadge";
 
 import type { Card, Player, PlayerRoundState } from "@flip-7/engine";
@@ -40,6 +41,10 @@ export function PlayerLane({
   const isBusted = playerRound.status === "busted";
   const isFlipped7 = playerRound.status === "flipped7";
   const isActive = playerRound.status === "active";
+  // A manually scored player never has cards to show — surfacing "no cards
+  // yet" and a unique-number count for them would read as a broken
+  // card-tracked lane rather than the first-class mode AGENTS.md calls for.
+  const isManual = playerRound.status === "manual";
   const hasCards = playerRound.numberCards.length > 0 || playerRound.modifierCards.length > 0;
 
   // A held Second Chance goes non-null → null two ways: it just saved a bust
@@ -122,37 +127,42 @@ export function PlayerLane({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1">
-        {hasCards ? (
-          playerRound.numberCards.map((card) => (
-            <DealtCardTile
-              key={card.id}
-              kind="number"
-              label={faceLabel(faceOfCard(card))}
-              muted={isBusted}
-              onLongPress={() => onLongPressCard?.(card)}
-              disabled={!onLongPressCard}
-            />
-          ))
-        ) : (
-          <span className="text-muted-foreground text-sm">No cards yet</span>
-        )}
-      </div>
+      {!isManual && (
+        <div className="flex flex-wrap gap-1">
+          {hasCards ? (
+            playerRound.numberCards.map((card) => (
+              <DealtCardTile
+                key={card.id}
+                kind="number"
+                label={faceLabel(faceOfCard(card))}
+                muted={isBusted}
+                onLongPress={() => onLongPressCard?.(card)}
+                disabled={!onLongPressCard}
+              />
+            ))
+          ) : (
+            <span className="text-muted-foreground text-sm">No cards yet</span>
+          )}
+        </div>
+      )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <span className="text-muted-foreground text-xs">
-          {playerRound.numberCards.length} unique number
-          {playerRound.numberCards.length === 1 ? "" : "s"}
+          {!isManual &&
+            `${playerRound.numberCards.length} unique number${playerRound.numberCards.length === 1 ? "" : "s"}`}
         </span>
-        <span
-          className={[
-            "text-lg font-semibold",
-            isBusted ? "text-status-busted line-through" : "",
-            isFlipped7 ? "text-status-flipped7" : "",
-          ].join(" ")}
-        >
-          {score.total}
-        </span>
+        <div className="flex flex-col items-end">
+          <ScoreBreakdownLine score={score} />
+          <span
+            className={[
+              "text-lg font-semibold",
+              isBusted ? "text-status-busted line-through" : "",
+              isFlipped7 ? "text-status-flipped7" : "",
+            ].join(" ")}
+          >
+            {score.total}
+          </span>
+        </div>
       </div>
     </li>
   );

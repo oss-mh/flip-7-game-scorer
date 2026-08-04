@@ -11,6 +11,7 @@ function buildSamplePlayerRoundState(playerId: string): PlayerRoundState {
     modifierCards: [],
     heldSecondChance: null,
     status: "active",
+    manualScore: null,
   };
 }
 

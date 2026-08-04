@@ -83,4 +83,17 @@ describe("RoundStarted", () => {
       DomainError,
     );
   });
+
+  it("rejects starting a new round once the game has ended", () => {
+    const events: GameEvent[] = [
+      gameCreated(),
+      roundStarted("alice"),
+      { ...envelope(), t: "ManualScoreEntered", playerId: "alice", points: 200 },
+      { ...envelope(), t: "ManualScoreEntered", playerId: "bob", points: 50 },
+      { ...envelope(), t: "ManualScoreEntered", playerId: "cara", points: 50 },
+      { ...envelope(), t: "RoundClosed" },
+    ];
+    expect(fold(events).status).toBe("completed");
+    expect(() => fold([...events, roundStarted("bob")])).toThrow(DomainError);
+  });
 });

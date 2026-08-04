@@ -1,14 +1,14 @@
 "use client";
 
-import { DEFAULT_TARGET_SCORE, EVENT_SCHEMA_VERSION, deckCountForPlayerCount } from "@flip-7/engine";
+import { DEFAULT_TARGET_SCORE, deckCountForPlayerCount } from "@flip-7/engine";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { createGame } from "@/lib/createGame";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
-import { systemClock } from "@/lib/systemClock";
 import { systemIdGenerator } from "@/lib/systemIdGenerator";
 
-import type { GameCreatedEvent, Player, RoundStartedEvent } from "@flip-7/engine";
+import type { Player } from "@flip-7/engine";
 
 interface DraftPlayer {
   readonly id: string;
@@ -108,33 +108,7 @@ export default function NewGamePage() {
     try {
       const finalPlayers: Player[] = players.map((p) => ({ id: p.id, name: p.name.trim() }));
       const firstDealerId = dealerId ?? finalPlayers[0].id;
-      const gameId = systemIdGenerator.next();
-      const at = systemClock.now();
-
-      await repository.createGame({
-        id: gameId,
-        players: finalPlayers,
-        targetScore,
-        createdAt: at,
-        archivedAt: null,
-      });
-
-      const gameCreated: GameCreatedEvent = {
-        schemaVersion: EVENT_SCHEMA_VERSION,
-        at,
-        seq: 1,
-        t: "GameCreated",
-        players: finalPlayers,
-        targetScore,
-      };
-      const roundStarted: RoundStartedEvent = {
-        schemaVersion: EVENT_SCHEMA_VERSION,
-        at,
-        seq: 2,
-        t: "RoundStarted",
-        dealerId: firstDealerId,
-      };
-      await repository.appendEvents(gameId, [gameCreated, roundStarted], 0);
+      const gameId = await createGame(repository, finalPlayers, targetScore, firstDealerId);
 
       router.push(`/game/${gameId}`);
     } catch (error) {

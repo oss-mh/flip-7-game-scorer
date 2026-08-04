@@ -3,6 +3,7 @@ import { applyActionTargeted } from "./reducers/actionTargeted.js";
 import { applyCardDealt } from "./reducers/cardDealt.js";
 import { applyDeckReshuffled } from "./reducers/deckReshuffled.js";
 import { applyGameCreated } from "./reducers/gameCreated.js";
+import { applyManualScoreEntered } from "./reducers/manualScoreEntered.js";
 import { applyPlayerStayed } from "./reducers/playerStayed.js";
 import { applyRoundClosed } from "./reducers/roundClosed.js";
 import { applyRoundStarted } from "./reducers/roundStarted.js";
@@ -25,15 +26,6 @@ export const initialState: GameState = {
 };
 
 /**
- * Marks an event type that's part of the union but whose reducer logic
- * hasn't landed yet. Throwing beats a silent no-op: per AGENTS.md's design
- * priorities, losing an event's effect would be worse than a loud failure.
- */
-function notImplemented(event: GameEvent, landsIn: string): never {
-  throw new DomainError(`"${event.t}" is not implemented yet (lands in ${landsIn})`);
-}
-
-/**
  * Pure fold of a single event onto state: no clock, no randomness, no IO.
  * Every branch is a case in the `GameEvent` union; the `never` guard in
  * `default` means a new event type fails to compile here until handled.
@@ -53,7 +45,7 @@ export function reduce(state: GameState, event: GameEvent): GameState {
     case "DeckReshuffled":
       return applyDeckReshuffled(state);
     case "ManualScoreEntered":
-      return notImplemented(event, "M6");
+      return applyManualScoreEntered(state, event);
     case "RoundClosed":
       return applyRoundClosed(state);
     default: {

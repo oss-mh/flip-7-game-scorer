@@ -1,9 +1,13 @@
 "use client";
 
-import { isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
-import { useState } from "react";
+import { gameWinners, isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { findCardDealtEvent } from "@/lib/cardCorrection";
+import { createGame } from "@/lib/createGame";
+import { isDeckExhausted } from "@/lib/deckTracking";
+import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { nextDealerId } from "@/lib/turnOrder";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
@@ -11,12 +15,15 @@ import { CardCorrectionDialog } from "./CardCorrectionDialog";
 import { CardPicker } from "./CardPicker";
 import { FlipThreeSequence } from "./FlipThreeSequence";
 import { InitialDeal } from "./InitialDeal";
+import { ManualScoreEntry } from "./ManualScoreEntry";
 import { PlayerLane } from "./PlayerLane";
+import { RoundSummary } from "./RoundSummary";
+import { Scoreboard } from "./Scoreboard";
 import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { ActionCard, Card, PlayerId } from "@flip-7/engine";
+import type { ActionCard, Card, Player, PlayerId } from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
@@ -30,9 +37,18 @@ function errorMessage(error: unknown): string {
  * (#70), the guided Flip Three sequence (#71) and the initial deal (#75)
  * each take over the controls area below the lanes when their resolution
  * is pending — this pass wires the normal hit-or-stay loop and round close.
+ *
+ * Closing a round and starting the next are separate dispatches (#77): once
+ * `RoundClosed` fires, `round` and `state.cumulativeScores` still describe
+ * the round that just ended (the reducer doesn't clear `currentRound`), so
+ * the summary renders from them until "Continue" dispatches `RoundStarted`.
+ * `justClosed` reads the tail of the event log rather than local state so
+ * the summary survives a reload or an undo mid-review.
  */
 export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const { state, events, dispatch, correctCard } = game;
+  const router = useRouter();
+  const repository = useGameRepository();
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
     round,
@@ -40,7 +56,17 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   );
   const initialDeal = useInitialDeal(round, state.players);
   const [showPicker, setShowPicker] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const manualModeRoundRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!round) return;
+    if (manualModeRoundRef.current !== round.roundNumber) {
+      manualModeRoundRef.current = round.roundNumber;
+      setManualMode(false);
+    }
+  }, [round]);
   const [busy, setBusy] = useState(false);
+  const [showScoreboard, setShowScoreboard] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [correctionTarget, setCorrectionTarget] = useState<{
     readonly playerId: PlayerId;
@@ -59,6 +85,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   const pending = nextResolution(state);
   const roundOver = isRoundOver(state);
+  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   const currentLegal = currentPlayerId ? legalActions(state, currentPlayerId) : null;
   const unusedSecondChanceHolders = state.players
     .filter((player) => round.players[player.id]?.heldSecondChance)
@@ -69,6 +96,17 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     (player) => round.players[player.id]?.status === "flipped7",
   );
   const initialDealTargetId = initialDeal.nextSeatId;
+  const canEnterManualMode = round.cardsDealt.length === 0;
+  const isManualRound = state.players.every(
+    (player) => round.players[player.id]?.status === "manual",
+  );
+  const gameOver = state.status === "completed";
+  const winnerIds = gameWinners(state);
+  const winners = state.players.filter((player) => winnerIds.includes(player.id));
+  const nextDealerIdValue = nextDealerId(state.players, round.dealerId);
+  const nextDealer: Player | null =
+    state.players.find((player) => player.id === nextDealerIdValue) ?? null;
+  const deckExhausted = isDeckExhausted(events, state.players.length);
   const correctionEvent = correctionTarget
     ? findCardDealtEvent(events, correctionTarget.playerId, correctionTarget.card)
     : null;
@@ -178,11 +216,63 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setActionError(null);
     setBusy(true);
     try {
-      const dealerId = nextDealerId(state.players, round.dealerId);
-      const commands = dealerId
-        ? [{ t: "RoundClosed" as const }, { t: "RoundStarted" as const, dealerId }]
-        : [{ t: "RoundClosed" as const }];
+      await dispatch([{ t: "RoundClosed" }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStartNextRound() {
+    if (!round) return;
+    const dealerId = nextDealerId(state.players, round.dealerId);
+    if (!dealerId) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      const commands = deckExhausted
+        ? [{ t: "DeckReshuffled" as const }, { t: "RoundStarted" as const, dealerId }]
+        : [{ t: "RoundStarted" as const, dealerId }];
       await dispatch(commands);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRematch() {
+    const firstDealer = state.players[0];
+    if (!firstDealer) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      const newGameId = await createGame(repository, state.players, state.targetScore, firstDealer.id);
+      router.push(`/game/${newGameId}`);
+    } catch (error) {
+      setActionError(errorMessage(error));
+      setBusy(false);
+    }
+  }
+
+  function handleEnterManualMode() {
+    initialDeal.skip();
+    setManualMode(true);
+  }
+
+  async function handleManualScores(scores: ReadonlyMap<PlayerId, number>) {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch(
+        Array.from(scores, ([playerId, points]) => ({
+          t: "ManualScoreEntered" as const,
+          playerId,
+          points,
+        })),
+      );
+      setManualMode(false);
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -194,7 +284,16 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     <div className="flex flex-1 flex-col gap-4 p-3">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Round {round.roundNumber}</h1>
-        <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+            onClick={() => setShowScoreboard(true)}
+          >
+            Scoreboard
+          </button>
+          <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
+        </div>
       </div>
 
       {flipped7Player && (
@@ -229,6 +328,16 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
       {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
+      {canEnterManualMode && !manualMode && !roundOver && !pending && (
+        <button
+          type="button"
+          className="text-muted-foreground min-h-0! min-w-0! self-center text-xs underline"
+          onClick={handleEnterManualMode}
+        >
+          Enter scores manually instead
+        </button>
+      )}
+
       <div className="mt-auto flex flex-col gap-3">
         {pending?.kind === "awaiting-target" ? (
           <ActionTargetPrompt
@@ -250,6 +359,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             busy={busy}
             onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
           />
+        ) : manualMode ? (
+          <ManualScoreEntry
+            round={round}
+            players={state.players}
+            busy={busy}
+            onSubmit={(scores) => void handleManualScores(scores)}
+            onCancel={() => setManualMode(false)}
+          />
         ) : initialDeal.active && initialDealTargetId ? (
           <InitialDeal
             round={round}
@@ -259,6 +376,19 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
             onSkip={initialDeal.skip}
           />
+        ) : justClosed ? (
+          <RoundSummary
+            round={round}
+            players={state.players}
+            cumulativeScores={state.cumulativeScores}
+            busy={busy}
+            gameOver={gameOver}
+            winners={winners}
+            nextDealer={nextDealer}
+            deckExhausted={deckExhausted}
+            onContinue={() => void handleStartNextRound()}
+            onRematch={() => void handleRematch()}
+          />
         ) : roundOver ? (
           <div className="flex flex-col items-center gap-2">
             {unusedSecondChanceHolders.length > 0 && (
@@ -267,9 +397,20 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
                 {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
               </p>
             )}
-            <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
-              Close round &amp; deal next
-            </button>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
+                Close round
+              </button>
+              {isManualRound && (
+                <button
+                  type="button"
+                  className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+                  onClick={() => setManualMode(true)}
+                >
+                  Edit scores
+                </button>
+              )}
+            </div>
           </div>
         ) : currentPlayerId && currentLegal ? (
           <>
@@ -318,6 +459,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           onRemove={() => void handleRemoveCard()}
           onReplace={(card) => void handleReplaceCard(card)}
           onCancel={() => setCorrectionTarget(null)}
+        />
+      )}
+
+      {showScoreboard && (
+        <Scoreboard
+          players={state.players}
+          cumulativeScores={state.cumulativeScores}
+          targetScore={state.targetScore}
+          onClose={() => setShowScoreboard(false)}
         />
       )}
     </div>
