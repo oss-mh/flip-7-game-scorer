@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
 import { DealtCardTile } from "./DealtCardTile";
+import { ScoreBreakdownLine } from "./ScoreBreakdownLine";
 import { StatusBadge } from "./StatusBadge";
 
 import type { Card, Player, PlayerRoundState } from "@flip-7/engine";
@@ -139,20 +140,23 @@ export function PlayerLane({
         )}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <span className="text-muted-foreground text-xs">
           {playerRound.numberCards.length} unique number
           {playerRound.numberCards.length === 1 ? "" : "s"}
         </span>
-        <span
-          className={[
-            "text-lg font-semibold",
-            isBusted ? "text-status-busted line-through" : "",
-            isFlipped7 ? "text-status-flipped7" : "",
-          ].join(" ")}
-        >
-          {score.total}
-        </span>
+        <div className="flex flex-col items-end">
+          <ScoreBreakdownLine score={score} />
+          <span
+            className={[
+              "text-lg font-semibold",
+              isBusted ? "text-status-busted line-through" : "",
+              isFlipped7 ? "text-status-flipped7" : "",
+            ].join(" ")}
+          >
+            {score.total}
+          </span>
+        </div>
       </div>
     </li>
   );
