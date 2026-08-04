@@ -44,9 +44,23 @@ export function applyRoundClosed(state: GameState): GameState {
   // left to target once the first Freeze takes the last active player out
   // — see #95. Discarding it here isn't a rules call, it's clearing out
   // something that could never legitimately resolve.
+
+  // The game ends at the end of the round in which someone reaches the
+  // target — never mid-round — and whoever has the highest cumulative
+  // score wins, not necessarily whoever crossed the target (#81). Checking
+  // every player's *banked* total here, after the loop above, is what
+  // makes that correct: a player who didn't cross the target this round
+  // can never have a higher total than one who did (their total is by
+  // definition still under target, which the crosser's is not), so this
+  // can't misfire on someone who merely didn't trigger the check.
+  const gameOver = state.players.some(
+    (player) => (cumulativeScores[player.id] ?? 0) >= state.targetScore,
+  );
+
   return {
     ...state,
     cumulativeScores,
+    status: gameOver ? "completed" : state.status,
     currentRound: { ...round, players, pendingResolutions: [] },
   };
 }

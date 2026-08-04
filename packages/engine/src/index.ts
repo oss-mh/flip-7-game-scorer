@@ -49,7 +49,7 @@ export type { IdGenerator } from "./ports/idGenerator.js";
 export type { Shuffler } from "./ports/shuffler.js";
 export { fold, initialState, reduce } from "./reduce.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
-export { isRoundOver, legalActions, nextResolution } from "./selectors.js";
+export { gameWinners, isRoundOver, legalActions, nextResolution } from "./selectors.js";
 export type { ScoreBreakdown } from "./scoring.js";
 export { scoreRound } from "./scoring.js";
 export type {

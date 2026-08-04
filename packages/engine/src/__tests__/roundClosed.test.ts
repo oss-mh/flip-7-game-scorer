@@ -4,7 +4,7 @@ import { createActionCard, createNumberCard } from "../cards.js";
 import { DomainError } from "../errors.js";
 import { EVENT_SCHEMA_VERSION, type ActionTargetedEvent, type GameEvent } from "../events.js";
 import { fold, reduce } from "../reduce.js";
-import { isRoundOver } from "../selectors.js";
+import { gameWinners, isRoundOver } from "../selectors.js";
 
 let seq = 0;
 function nextSeq(): number {
@@ -251,6 +251,94 @@ describe("RoundClosed", () => {
     ];
     const state = fold(events);
     expect(state.currentRound?.pendingResolutions).toEqual([]);
+  });
+});
+
+function manualScoreEntered(playerId: string, points: number): GameEvent {
+  return { ...envelope(), t: "ManualScoreEntered", playerId, points };
+}
+
+describe("game over detection (#81)", () => {
+  it("stays active when nobody has reached the target", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      roundClosed(),
+    ];
+    expect(fold(events).status).toBe("active");
+  });
+
+  it("completes the game once a player's cumulative score reaches the target exactly", () => {
+    const events = [
+      gameCreated(),
+      roundStarted("alice"),
+      manualScoreEntered("alice", 200),
+      manualScoreEntered("bob", 50),
+      roundClosed(),
+    ];
+    expect(fold(events).status).toBe("completed");
+  });
+
+  it("completes the game when a player exceeds the target, not just reaches it exactly", () => {
+    const events = [
+      gameCreated(),
+      roundStarted("alice"),
+      manualScoreEntered("alice", 205),
+      manualScoreEntered("bob", 50),
+      roundClosed(),
+    ];
+    expect(fold(events).status).toBe("completed");
+  });
+});
+
+describe("gameWinners", () => {
+  it("is empty while the game is still active", () => {
+    const events = [
+      ...setup,
+      cardDealt("alice", 5),
+      playerStayed("alice"),
+      cardDealt("bob", 3),
+      playerStayed("bob"),
+      roundClosed(),
+    ];
+    expect(gameWinners(fold(events))).toEqual([]);
+  });
+
+  it("names the single highest cumulative score once the game ends", () => {
+    const events = [
+      gameCreated(),
+      roundStarted("alice"),
+      manualScoreEntered("alice", 150),
+      manualScoreEntered("bob", 210),
+      roundClosed(),
+    ];
+    expect(gameWinners(fold(events))).toEqual(["bob"]);
+  });
+
+  it("picks the highest total among several players who cross the target in the same round, not just the first one found", () => {
+    const events = [
+      gameCreated3(),
+      roundStarted("alice"),
+      manualScoreEntered("alice", 205),
+      manualScoreEntered("bob", 230),
+      manualScoreEntered("carol", 50),
+      roundClosed(),
+    ];
+    expect(gameWinners(fold(events))).toEqual(["bob"]);
+  });
+
+  it("names every player tied for the highest score", () => {
+    const events = [
+      gameCreated(),
+      roundStarted("alice"),
+      manualScoreEntered("alice", 200),
+      manualScoreEntered("bob", 200),
+      roundClosed(),
+    ];
+    expect([...gameWinners(fold(events))].sort()).toEqual(["alice", "bob"]);
   });
 });
 

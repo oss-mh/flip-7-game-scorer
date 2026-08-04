@@ -34,6 +34,12 @@ function buildLongGameLog(roundCount: number): GameEvent[] {
     seq: seq++,
     t: "GameCreated",
     players: PLAYERS,
+    // Well above anything roundCount rounds of 5+5 points could reach, so
+    // the game never ends partway through — this fixture exists to be
+    // long, not to finish (see AGENTS.md #81, "detection runs at round
+    // close": a target within reach here would legitimately end the game
+    // and reject the next RoundStarted).
+    targetScore: 1_000_000,
   });
 
   for (let round = 0; round < roundCount; round += 1) {

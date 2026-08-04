@@ -30,6 +30,24 @@ export function nextResolution(state: GameState): PendingResolution | null {
   return round.pendingResolutions[0] ?? null;
 }
 
+/**
+ * Every player tied for the highest cumulative score once the game has
+ * ended (#81) — empty while `status` is still "active", since a winner
+ * only exists once `RoundClosed` has actually declared the game over, not
+ * mid-round.
+ */
+export function gameWinners(state: GameState): readonly PlayerId[] {
+  if (state.status !== "completed") {
+    return [];
+  }
+  const topScore = Math.max(
+    ...state.players.map((player) => state.cumulativeScores[player.id] ?? 0),
+  );
+  return state.players
+    .filter((player) => (state.cumulativeScores[player.id] ?? 0) === topScore)
+    .map((player) => player.id);
+}
+
 export type LegalMove = "hit" | "stay";
 
 export interface LegalActionsResult {

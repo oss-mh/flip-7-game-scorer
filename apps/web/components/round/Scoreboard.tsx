@@ -1,12 +1,8 @@
 "use client";
 
-import type { Player, PlayerId } from "@flip-7/engine";
+import { joinNames } from "@/lib/format";
 
-function joinNames(names: readonly string[]): string {
-  if (names.length <= 1) return names[0] ?? "";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
+import type { Player, PlayerId } from "@flip-7/engine";
 
 /**
  * Cumulative standings (#80), an overlay so it's reachable from anywhere on

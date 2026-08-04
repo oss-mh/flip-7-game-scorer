@@ -1,9 +1,12 @@
 "use client";
 
-import { isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
+import { gameWinners, isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { findCardDealtEvent } from "@/lib/cardCorrection";
+import { createGame } from "@/lib/createGame";
+import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { nextDealerId } from "@/lib/turnOrder";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
@@ -43,6 +46,8 @@ function errorMessage(error: unknown): string {
  */
 export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const { state, events, dispatch, correctCard } = game;
+  const router = useRouter();
+  const repository = useGameRepository();
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
     round,
@@ -94,6 +99,9 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const isManualRound = state.players.every(
     (player) => round.players[player.id]?.status === "manual",
   );
+  const gameOver = state.status === "completed";
+  const winnerIds = gameWinners(state);
+  const winners = state.players.filter((player) => winnerIds.includes(player.id));
   const correctionEvent = correctionTarget
     ? findCardDealtEvent(events, correctionTarget.playerId, correctionTarget.card)
     : null;
@@ -226,6 +234,20 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     }
   }
 
+  async function handleRematch() {
+    const firstDealer = state.players[0];
+    if (!firstDealer) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      const newGameId = await createGame(repository, state.players, state.targetScore, firstDealer.id);
+      router.push(`/game/${newGameId}`);
+    } catch (error) {
+      setActionError(errorMessage(error));
+      setBusy(false);
+    }
+  }
+
   function handleEnterManualMode() {
     initialDeal.skip();
     setManualMode(true);
@@ -352,7 +374,10 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             players={state.players}
             cumulativeScores={state.cumulativeScores}
             busy={busy}
+            gameOver={gameOver}
+            winners={winners}
             onContinue={() => void handleStartNextRound()}
+            onRematch={() => void handleRematch()}
           />
         ) : roundOver ? (
           <div className="flex flex-col items-center gap-2">

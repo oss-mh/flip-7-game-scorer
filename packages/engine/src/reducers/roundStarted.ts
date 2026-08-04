@@ -35,6 +35,10 @@ function freshPlayerRoundState(playerId: PlayerId): PlayerRoundState {
  * no previous dealer, so the event's choice is trusted as-is.
  */
 export function applyRoundStarted(state: GameState, event: RoundStartedEvent): GameState {
+  if (state.status === "completed") {
+    throw new DomainError("Cannot start a new round — the game has already ended");
+  }
+
   const previousDealerId = state.currentRound?.dealerId ?? null;
 
   if (previousDealerId === null) {

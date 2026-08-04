@@ -2,6 +2,8 @@
 
 import { scoreRound } from "@flip-7/engine";
 
+import { joinNames } from "@/lib/format";
+
 import { ScoreBreakdownLine } from "./ScoreBreakdownLine";
 import { StatusBadge } from "./StatusBadge";
 
@@ -14,21 +16,36 @@ import type { Player, PlayerId, RoundState } from "@flip-7/engine";
  * `RoundClosed` banks scores but doesn't clear `currentRound` (#77). Reuses
  * `scoreRound` and `ScoreBreakdownLine` rather than recomputing anything, so
  * this never duplicates rules the engine already decided — AGENTS.md
- * invariant #5.
+ * invariant #5. When the round that just closed also ended the game (#81 —
+ * `gameOver`/`winners` come from the engine's own `status`/`gameWinners`,
+ * never re-derived here), the "start next round" action is replaced with
+ * final standings and a rematch action instead.
  */
 export function RoundSummary({
   round,
   players,
   cumulativeScores,
   busy,
+  gameOver,
+  winners,
   onContinue,
+  onRematch,
 }: {
   readonly round: RoundState;
   readonly players: readonly Player[];
   readonly cumulativeScores: Readonly<Record<PlayerId, number>>;
   readonly busy: boolean;
+  readonly gameOver: boolean;
+  readonly winners: readonly Player[];
   readonly onContinue: () => void;
+  readonly onRematch: () => void;
 }) {
+  const finalStandings = gameOver
+    ? [...players]
+        .map((player) => ({ player, score: cumulativeScores[player.id] ?? 0 }))
+        .sort((a, b) => b.score - a.score)
+    : [];
+
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-center text-lg font-semibold">Round {round.roundNumber} complete</h2>
@@ -64,9 +81,32 @@ export function RoundSummary({
           );
         })}
       </ul>
-      <button type="button" onClick={onContinue} disabled={busy}>
-        Start round {round.roundNumber + 1}
-      </button>
+
+      {gameOver ? (
+        <div className="border-status-flipped7 bg-status-flipped7/10 flex flex-col items-center gap-3 rounded-lg border-2 p-3">
+          <p className="text-status-flipped7 text-center font-semibold">
+            ★ {joinNames(winners.map((winner) => winner.name))}{" "}
+            {winners.length > 1 ? "tie for the win" : "wins"}! ★
+          </p>
+          <ol className="flex w-full flex-col gap-1">
+            {finalStandings.map(({ player, score }, index) => (
+              <li key={player.id} className="flex items-center justify-between text-sm">
+                <span>
+                  {index + 1}. {player.name}
+                </span>
+                <span className="font-semibold tabular-nums">{score}</span>
+              </li>
+            ))}
+          </ol>
+          <button type="button" onClick={onRematch} disabled={busy}>
+            Rematch
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={onContinue} disabled={busy}>
+          Start round {round.roundNumber + 1}
+        </button>
+      )}
     </div>
   );
 }
