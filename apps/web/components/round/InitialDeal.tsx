@@ -2,7 +2,7 @@
 
 import { CardPicker } from "./CardPicker";
 
-import type { Card, Player, PlayerId, RoundState } from "@flip-7/engine";
+import type { Card, Player, PlayerId, RemainingDeckReport, RoundState } from "@flip-7/engine";
 
 function playerName(players: readonly Player[], playerId: PlayerId): string {
   return players.find((player) => player.id === playerId)?.name ?? playerId;
@@ -19,6 +19,8 @@ export function InitialDeal({
   round,
   players,
   targetPlayerId,
+  remaining,
+  purist,
   onDeal,
   onSkip,
   busy,
@@ -26,6 +28,8 @@ export function InitialDeal({
   readonly round: RoundState;
   readonly players: readonly Player[];
   readonly targetPlayerId: PlayerId;
+  readonly remaining: RemainingDeckReport;
+  readonly purist: boolean;
   readonly onDeal: (card: Card) => void;
   readonly onSkip: () => void;
   readonly busy: boolean;
@@ -49,7 +53,8 @@ export function InitialDeal({
       </p>
       <CardPicker
         cardsDealt={round.cardsDealt}
-        playerCount={players.length}
+        remaining={remaining}
+        purist={purist}
         onDeal={onDeal}
         disabled={busy}
       />

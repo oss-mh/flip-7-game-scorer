@@ -23,6 +23,7 @@ export async function createGame(
   players: readonly Player[],
   targetScore: number,
   firstDealerId: PlayerId,
+  purist = false,
 ): Promise<GameId> {
   const gameId = systemIdGenerator.next();
   const at = systemClock.now();
@@ -42,6 +43,7 @@ export async function createGame(
     t: "GameCreated",
     players,
     targetScore,
+    purist,
   };
   const roundStarted: RoundStartedEvent = {
     schemaVersion: EVENT_SCHEMA_VERSION,

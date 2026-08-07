@@ -1,17 +1,25 @@
 "use client";
 
-import { gameWinners, isRoundOver, legalActions, nextResolution } from "@flip-7/engine";
+import {
+  bustProbability,
+  gameWinners,
+  isRoundOver,
+  legalActions,
+  nextResolution,
+  remainingDeck,
+} from "@flip-7/engine";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { totalRemainingCards } from "@/lib/cardCatalog";
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
-import { isDeckExhausted } from "@/lib/deckTracking";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { nextDealerId } from "@/lib/turnOrder";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardCorrectionDialog } from "./CardCorrectionDialog";
+import { CardCounterPanel } from "./CardCounterPanel";
 import { CardPicker } from "./CardPicker";
 import { FlipThreeSequence } from "./FlipThreeSequence";
 import { InitialDeal } from "./InitialDeal";
@@ -106,7 +114,11 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const nextDealerIdValue = nextDealerId(state.players, round.dealerId);
   const nextDealer: Player | null =
     state.players.find((player) => player.id === nextDealerIdValue) ?? null;
-  const deckExhausted = isDeckExhausted(events, state.players.length);
+  // The single source of truth for deck composition (#38) — computed once
+  // per render and threaded to the picker, the counter panel and each
+  // lane's bust risk, rather than each recomputing it from `events`.
+  const remaining = remainingDeck(events);
+  const deckExhausted = totalRemainingCards(remaining) === 0;
   const correctionEvent = correctionTarget
     ? findCardDealtEvent(events, correctionTarget.playerId, correctionTarget.card)
     : null;
@@ -248,7 +260,13 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setActionError(null);
     setBusy(true);
     try {
-      const newGameId = await createGame(repository, state.players, state.targetScore, firstDealer.id);
+      const newGameId = await createGame(
+        repository,
+        state.players,
+        state.targetScore,
+        firstDealer.id,
+        state.purist,
+      );
       router.push(`/game/${newGameId}`);
     } catch (error) {
       setActionError(errorMessage(error));
@@ -296,6 +314,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         </div>
       </div>
 
+      {!state.purist && <CardCounterPanel remaining={remaining} />}
+
       {flipped7Player && (
         <p
           role="status"
@@ -316,6 +336,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               playerRound={playerRound}
               isDealer={player.id === round.dealerId}
               isCurrentPlayer={player.id === currentPlayerId}
+              bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
               onSelect={() => selectPlayer(player.id)}
               onLongPressCard={(card) => {
                 setCorrectionError(null);
@@ -356,6 +377,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             upNext={round.pendingResolutions.slice(1)}
             round={round}
             players={state.players}
+            remaining={remaining}
+            purist={state.purist}
             busy={busy}
             onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
           />
@@ -372,6 +395,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             round={round}
             players={state.players}
             targetPlayerId={initialDealTargetId}
+            remaining={remaining}
+            purist={state.purist}
             busy={busy}
             onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
             onSkip={initialDeal.skip}
@@ -417,7 +442,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             {showPicker ? (
               <CardPicker
                 cardsDealt={round.cardsDealt}
-                playerCount={state.players.length}
+                remaining={remaining}
+                purist={state.purist}
                 onDeal={(card) => void handleHitDeal(card)}
                 disabled={busy}
               />
@@ -453,7 +479,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           target={correctionEvent}
           playerName={correctionPlayerName}
           round={round}
-          playerCount={state.players.length}
+          remaining={remaining}
+          purist={state.purist}
           busy={correctionBusy}
           error={correctionError}
           onRemove={() => void handleRemoveCard()}
@@ -467,6 +494,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           players={state.players}
           cumulativeScores={state.cumulativeScores}
           targetScore={state.targetScore}
+          purist={state.purist}
           onClose={() => setShowScoreboard(false)}
         />
       )}

@@ -44,6 +44,16 @@ describe("GameCreated", () => {
     expect(state.targetScore).toBe(350);
   });
 
+  it("defaults purist mode to false when omitted", () => {
+    const state = fold([gameCreated()]);
+    expect(state.purist).toBe(false);
+  });
+
+  it("locks in purist mode when set at creation", () => {
+    const state = fold([gameCreated({ purist: true })]);
+    expect(state.purist).toBe(true);
+  });
+
   it("permits duplicate player names", () => {
     const state = fold([
       gameCreated({

@@ -26,6 +26,7 @@ export function PlayerLane({
   playerRound,
   isDealer,
   isCurrentPlayer,
+  bustRisk,
   onSelect,
   onLongPressCard,
 }: {
@@ -33,6 +34,8 @@ export function PlayerLane({
   readonly playerRound: PlayerRoundState;
   readonly isDealer: boolean;
   readonly isCurrentPlayer: boolean;
+  /** Chance the next card dealt busts this hand (#83) — null to hide it entirely (purist mode, #40). */
+  readonly bustRisk: number | null;
   readonly onSelect: () => void;
   /** Mistap correction (#74) — long-press a dealt card to remove or replace it. */
   readonly onLongPressCard?: (card: Card) => void;
@@ -147,10 +150,20 @@ export function PlayerLane({
       )}
 
       <div className="flex items-end justify-between">
-        <span className="text-muted-foreground text-xs">
-          {!isManual &&
-            `${playerRound.numberCards.length} unique number${playerRound.numberCards.length === 1 ? "" : "s"}`}
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-muted-foreground text-xs">
+            {!isManual &&
+              `${playerRound.numberCards.length} unique number${playerRound.numberCards.length === 1 ? "" : "s"}`}
+          </span>
+          {isActive && bustRisk !== null && (
+            <span
+              className="text-muted-foreground text-xs"
+              title="Chance the next card dealt busts this hand, from what's left in the deck"
+            >
+              {Math.round(bustRisk * 100)}% bust risk
+            </span>
+          )}
+        </div>
         <div className="flex flex-col items-end">
           <ScoreBreakdownLine score={score} />
           <span

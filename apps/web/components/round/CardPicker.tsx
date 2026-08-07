@@ -7,13 +7,13 @@ import {
   faceKey,
   faceLabel,
   nextCardForFace,
-  remainingForFace,
+  remainingCountForFace,
 } from "@/lib/cardCatalog";
 
 import { CARD_KIND_CLASSES } from "./CardTile";
 
 import type { CardFace } from "@/lib/cardCatalog";
-import type { Card } from "@flip-7/engine";
+import type { Card, RemainingDeckReport } from "@flip-7/engine";
 
 const SECTION_TITLES: Record<CardFace["kind"], string> = {
   number: "Numbers",
@@ -32,7 +32,10 @@ const SECTIONS = groupByKind();
 /**
  * The tap-to-deal grid (#67): every face at a fixed position so the layout
  * is muscle-memory stable across the whole game, with a remaining-copies
- * badge and exhaustion dimming (#68). `onDeal` mints the next unused copy
+ * badge and exhaustion dimming (#68) — unless the game is in purist mode
+ * (#40), which some tables consider these a form of cheating: no badge, no
+ * dimming, every face always tappable, and no override toggle since
+ * nothing is ever blocked to override. `onDeal` mints the next unused copy
  * of whichever face was tapped and leaves dispatching it to the caller,
  * which decides *who* it's dealt to (the current player for a Hit, a
  * forced-draw player during Flip Three, the next seat during the initial
@@ -40,12 +43,14 @@ const SECTIONS = groupByKind();
  */
 export function CardPicker({
   cardsDealt,
-  playerCount,
+  remaining,
+  purist = false,
   onDeal,
   disabled = false,
 }: {
   readonly cardsDealt: readonly Card[];
-  readonly playerCount: number;
+  readonly remaining: RemainingDeckReport;
+  readonly purist?: boolean;
   readonly onDeal: (card: Card) => void;
   readonly disabled?: boolean;
 }) {
@@ -60,17 +65,19 @@ export function CardPicker({
     <div className="border-border bg-surface flex flex-col gap-3 rounded-lg border p-3">
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground text-xs">Tap a card to deal it</span>
-        <button
-          type="button"
-          aria-pressed={overrideEnabled}
-          onClick={() => setOverrideEnabled((value) => !value)}
-          className={[
-            "min-h-0! min-w-0! rounded px-2 py-1 text-xs",
-            overrideEnabled ? "bg-status-busted/20 text-status-busted" : "text-muted-foreground",
-          ].join(" ")}
-        >
-          {overrideEnabled ? "Miscount override: on" : "Miscount override"}
-        </button>
+        {!purist && (
+          <button
+            type="button"
+            aria-pressed={overrideEnabled}
+            onClick={() => setOverrideEnabled((value) => !value)}
+            className={[
+              "min-h-0! min-w-0! rounded px-2 py-1 text-xs",
+              overrideEnabled ? "bg-status-busted/20 text-status-busted" : "text-muted-foreground",
+            ].join(" ")}
+          >
+            {overrideEnabled ? "Miscount override: on" : "Miscount override"}
+          </button>
+        )}
       </div>
 
       {(Object.keys(SECTIONS) as CardFace["kind"][]).map((kind) => (
@@ -80,8 +87,8 @@ export function CardPicker({
           </span>
           <div className="flex flex-wrap gap-2">
             {SECTIONS[kind].map((face) => {
-              const remaining = remainingForFace(cardsDealt, face, playerCount);
-              const exhausted = remaining <= 0;
+              const facesLeft = remainingCountForFace(remaining, face);
+              const exhausted = !purist && facesLeft <= 0;
               const tappable = !disabled && (!exhausted || overrideEnabled);
               const label = faceLabel(face);
               return (
@@ -98,9 +105,11 @@ export function CardPicker({
                   ].join(" ")}
                 >
                   {label}
-                  <span className="border-border bg-background text-muted-foreground absolute -top-2 -right-2 min-w-4 rounded-full border px-1 text-[10px] leading-4">
-                    {Math.max(0, remaining)}
-                  </span>
+                  {!purist && (
+                    <span className="border-border bg-background text-muted-foreground absolute -top-2 -right-2 min-w-4 rounded-full border px-1 text-[10px] leading-4">
+                      {facesLeft}
+                    </span>
+                  )}
                 </button>
               );
             })}

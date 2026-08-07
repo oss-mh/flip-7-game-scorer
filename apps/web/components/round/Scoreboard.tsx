@@ -16,11 +16,14 @@ export function Scoreboard({
   players,
   cumulativeScores,
   targetScore,
+  purist,
   onClose,
 }: {
   readonly players: readonly Player[];
   readonly cumulativeScores: Readonly<Record<PlayerId, number>>;
   readonly targetScore: number;
+  /** Whether counting aids are switched off for this game (#40) — shown here so everyone at the table knows which mode is in play. */
+  readonly purist: boolean;
   readonly onClose: () => void;
 }) {
   const standings = [...players]
@@ -41,7 +44,17 @@ export function Scoreboard({
     >
       <div className="border-border bg-surface flex w-full max-w-sm flex-col gap-3 rounded-lg border p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Scoreboard</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Scoreboard</h2>
+            {purist && (
+              <span
+                className="text-muted-foreground rounded-full border border-border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide"
+                title="Counting aids are switched off for this game"
+              >
+                Purist mode
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
