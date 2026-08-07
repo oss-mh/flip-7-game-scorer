@@ -29,6 +29,8 @@ export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
 export { DomainError, SchemaMigrationError } from "./errors.js";
 export type { HitStayExpectedValue } from "./flip7Odds.js";
 export { expectedValueOfNextMove, flip7Probability } from "./flip7Odds.js";
+export type { PlayerLifetimeStats } from "./lifetimeStats.js";
+export { lifetimePlayerStats } from "./lifetimeStats.js";
 export type {
   ActionTargetedEvent,
   CardDealtEvent,
