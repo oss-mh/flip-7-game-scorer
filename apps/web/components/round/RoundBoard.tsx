@@ -17,6 +17,7 @@ import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { nextDealerId } from "@/lib/turnOrder";
+import { useWakeLock } from "@/lib/useWakeLock";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardCorrectionDialog } from "./CardCorrectionDialog";
@@ -84,6 +85,12 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   } | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
+  // "In progress" ends the moment RoundClosed fires, even though `round`
+  // itself stays populated through the summary screen — see the doc
+  // comment above on why `currentRound` isn't cleared until the next round
+  // starts.
+  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
+  useWakeLock(round !== null && !justClosed);
 
   if (!round) {
     return (
@@ -95,7 +102,6 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   const pending = nextResolution(state);
   const roundOver = isRoundOver(state);
-  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   const currentLegal = currentPlayerId ? legalActions(state, currentPlayerId) : null;
   const unusedSecondChanceHolders = state.players
     .filter((player) => round.players[player.id]?.heldSecondChance)

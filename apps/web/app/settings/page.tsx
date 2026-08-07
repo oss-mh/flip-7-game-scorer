@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useGameRepository } from "@/lib/gameRepositoryContext";
+import { usePreference } from "@/lib/usePreference";
 
 function toErrorMessage(value: unknown): string {
   return value instanceof Error ? value.message : String(value);
@@ -10,6 +11,7 @@ function toErrorMessage(value: unknown): string {
 
 export default function SettingsPage() {
   const repository = useGameRepository();
+  const [wakeLockEnabled, setWakeLockEnabled] = usePreference("wakeLockEnabled", true);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cleared, setCleared] = useState(false);
@@ -43,6 +45,22 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-1 flex-col items-center gap-6 p-4">
       <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+
+      <section className="flex w-full max-w-md flex-col gap-2 rounded border border-border p-4">
+        <h2 className="font-semibold">Keep screen awake</h2>
+        <p className="text-muted-foreground text-sm">
+          Stops the screen from dimming or locking while a round is in progress. Releases
+          automatically between rounds and when you leave the game.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={wakeLockEnabled}
+            onChange={(event) => setWakeLockEnabled(event.target.checked)}
+          />
+          Keep screen awake during a round
+        </label>
+      </section>
 
       <section className="flex w-full max-w-md flex-col gap-2 rounded border border-border p-4">
         <h2 className="font-semibold">Clear all games</h2>
