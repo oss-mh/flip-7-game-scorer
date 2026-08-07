@@ -9,6 +9,7 @@ import type {
   ForcedDrawRemainingResolution,
   PendingResolution,
   Player,
+  RemainingDeckReport,
   RoundState,
 } from "@flip-7/engine";
 
@@ -42,6 +43,7 @@ export function FlipThreeSequence({
   upNext,
   round,
   players,
+  remaining,
   onDeal,
   busy,
 }: {
@@ -49,6 +51,7 @@ export function FlipThreeSequence({
   readonly upNext: readonly PendingResolution[];
   readonly round: RoundState;
   readonly players: readonly Player[];
+  readonly remaining: RemainingDeckReport;
   readonly onDeal: (card: Card) => void;
   readonly busy: boolean;
 }) {
@@ -76,7 +79,7 @@ export function FlipThreeSequence({
       )}
       <CardPicker
         cardsDealt={round.cardsDealt}
-        playerCount={players.length}
+        remaining={remaining}
         onDeal={onDeal}
         disabled={busy}
       />

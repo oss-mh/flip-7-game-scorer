@@ -1,51 +1,20 @@
 import {
-  ACTION_TYPES,
-  MODIFIER_VALUES,
-  NUMBER_VALUES,
+  CARD_FACES,
   createActionCard,
   createModifierCard,
   createNumberCard,
-  deckCountForPlayerCount,
-  isActionCard,
-  isModifierCard,
+  faceKey,
+  faceOfCard,
 } from "@flip-7/engine";
 
-import type { ActionType, Card, ModifierValue, NumberValue } from "@flip-7/engine";
+import type { ActionType, Card, CardFace, RemainingDeckReport } from "@flip-7/engine";
 
-/**
- * A card *face* — one of the 22 distinct buttons in the picker grid — as
- * opposed to a `Card`, which is one specific physical copy of a face (e.g.
- * "the second 7"). The picker is keyed on faces; dealing mints the next
- * unused copy of whichever face was tapped, via `nextCardForFace`.
- */
-export type CardFace =
-  | { readonly kind: "number"; readonly value: NumberValue }
-  | { readonly kind: "modifier"; readonly modifier: ModifierValue }
-  | { readonly kind: "action"; readonly action: ActionType };
-
-/** Fixed grid order — never reorder this array. #67 requires the picker to be "muscle-memory stable". */
-export const CARD_FACES: readonly CardFace[] = [
-  ...NUMBER_VALUES.map((value): CardFace => ({ kind: "number", value })),
-  ...MODIFIER_VALUES.map((modifier): CardFace => ({ kind: "modifier", modifier })),
-  ...ACTION_TYPES.map((action): CardFace => ({ kind: "action", action })),
-];
-
-export function faceKey(face: CardFace): string {
-  switch (face.kind) {
-    case "number":
-      return `number-${face.value}`;
-    case "modifier":
-      return `modifier-${face.modifier}`;
-    case "action":
-      return `action-${face.action}`;
-  }
-}
-
-export function faceOfCard(card: Card): CardFace {
-  if (isActionCard(card)) return { kind: "action", action: card.action };
-  if (isModifierCard(card)) return { kind: "modifier", modifier: card.modifier };
-  return { kind: "number", value: card.value };
-}
+// CardFace, CARD_FACES, faceOfCard and faceKey now live in @flip-7/engine
+// (#38/#39) — re-exported here so existing call sites in this app don't all
+// need their import path changed, and so this module stays the one place
+// components reach for anything face-related.
+export type { CardFace } from "@flip-7/engine";
+export { CARD_FACES, faceKey, faceOfCard };
 
 const ACTION_LABELS: Record<ActionType, string> = {
   freeze: "Freeze",
@@ -69,13 +38,6 @@ export function cardLabel(card: Card): string {
   return faceLabel(faceOfCard(card));
 }
 
-/** Copies of this face printed in a single 94-card deck. */
-function copiesPerDeck(face: CardFace): number {
-  if (face.kind === "number") return face.value === 0 ? 1 : face.value;
-  if (face.kind === "modifier") return 1;
-  return 3;
-}
-
 /** How many copies of `face` have already been dealt this round, across any number of decks. */
 export function dealtCountForFace(cardsDealt: readonly Card[], face: CardFace): number {
   const key = faceKey(face);
@@ -87,24 +49,26 @@ export function dealtCountForFace(cardsDealt: readonly Card[], face: CardFace): 
 }
 
 /**
- * Copies of `face` left in the deck(s) this table is playing with. Can go
- * negative in principle if the operator overrides an exhausted face (#68) —
- * callers should clamp to 0 for display.
+ * Copies of `face` left in the deck(s) this table is playing with, per the
+ * whole-game `remainingDeck` report (#38) — correct across rounds and
+ * reshuffles, unlike a count over just this round's `cardsDealt`. Already
+ * clamped to never go negative by `remainingDeck` itself.
  */
-export function remainingForFace(
-  cardsDealt: readonly Card[],
-  face: CardFace,
-  playerCount: number,
-): number {
-  const total = copiesPerDeck(face) * deckCountForPlayerCount(playerCount);
-  return total - dealtCountForFace(cardsDealt, face);
+export function remainingCountForFace(report: RemainingDeckReport, face: CardFace): number {
+  const key = faceKey(face);
+  return report.counts.find((count) => faceKey(count.face) === key)?.remaining ?? 0;
+}
+
+/** Total cards left across every face — 0 once the table needs a reshuffle. */
+export function totalRemainingCards(report: RemainingDeckReport): number {
+  return report.counts.reduce((sum, count) => sum + count.remaining, 0);
 }
 
 /**
  * The next specific `Card` a tap on `face` should deal — the next unused
  * copy index, purely a count of how many of this face are already in
- * `cardsDealt`. Deliberately doesn't consult `remainingForFace`: the engine
- * places no ceiling on copy index (see AGENTS.md — the physical deck is the
+ * `cardsDealt`. Deliberately doesn't consult `remainingCountForFace`: the
+ * engine places no ceiling on copy index (see AGENTS.md — the physical deck is the
  * source of truth, not this app), so an operator override past the natural
  * deck size just mints copy N+1 and works exactly the same as any other card.
  */

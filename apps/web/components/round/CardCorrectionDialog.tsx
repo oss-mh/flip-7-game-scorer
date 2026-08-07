@@ -6,7 +6,7 @@ import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
 import { CardPicker } from "./CardPicker";
 
-import type { Card, CardDealtEvent, RoundState } from "@flip-7/engine";
+import type { Card, CardDealtEvent, RemainingDeckReport, RoundState } from "@flip-7/engine";
 
 /**
  * Long-press correction (#74): remove a mis-dealt card or swap it for the
@@ -21,7 +21,7 @@ export function CardCorrectionDialog({
   target,
   playerName,
   round,
-  playerCount,
+  remaining,
   onRemove,
   onReplace,
   onCancel,
@@ -31,7 +31,7 @@ export function CardCorrectionDialog({
   readonly target: CardDealtEvent;
   readonly playerName: string;
   readonly round: RoundState;
-  readonly playerCount: number;
+  readonly remaining: RemainingDeckReport;
   readonly onRemove: () => void;
   readonly onReplace: (card: Card) => void;
   readonly onCancel: () => void;
@@ -82,7 +82,7 @@ export function CardCorrectionDialog({
             <p className="text-muted-foreground text-xs">Tap the correct card.</p>
             <CardPicker
               cardsDealt={round.cardsDealt}
-              playerCount={playerCount}
+              remaining={remaining}
               onDeal={onReplace}
               disabled={busy}
             />

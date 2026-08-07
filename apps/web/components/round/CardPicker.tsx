@@ -7,13 +7,13 @@ import {
   faceKey,
   faceLabel,
   nextCardForFace,
-  remainingForFace,
+  remainingCountForFace,
 } from "@/lib/cardCatalog";
 
 import { CARD_KIND_CLASSES } from "./CardTile";
 
 import type { CardFace } from "@/lib/cardCatalog";
-import type { Card } from "@flip-7/engine";
+import type { Card, RemainingDeckReport } from "@flip-7/engine";
 
 const SECTION_TITLES: Record<CardFace["kind"], string> = {
   number: "Numbers",
@@ -40,12 +40,12 @@ const SECTIONS = groupByKind();
  */
 export function CardPicker({
   cardsDealt,
-  playerCount,
+  remaining,
   onDeal,
   disabled = false,
 }: {
   readonly cardsDealt: readonly Card[];
-  readonly playerCount: number;
+  readonly remaining: RemainingDeckReport;
   readonly onDeal: (card: Card) => void;
   readonly disabled?: boolean;
 }) {
@@ -80,8 +80,8 @@ export function CardPicker({
           </span>
           <div className="flex flex-wrap gap-2">
             {SECTIONS[kind].map((face) => {
-              const remaining = remainingForFace(cardsDealt, face, playerCount);
-              const exhausted = remaining <= 0;
+              const facesLeft = remainingCountForFace(remaining, face);
+              const exhausted = facesLeft <= 0;
               const tappable = !disabled && (!exhausted || overrideEnabled);
               const label = faceLabel(face);
               return (
@@ -99,7 +99,7 @@ export function CardPicker({
                 >
                   {label}
                   <span className="border-border bg-background text-muted-foreground absolute -top-2 -right-2 min-w-4 rounded-full border px-1 text-[10px] leading-4">
-                    {Math.max(0, remaining)}
+                    {facesLeft}
                   </span>
                 </button>
               );
