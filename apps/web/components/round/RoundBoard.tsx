@@ -8,7 +8,8 @@ import {
   nextResolution,
   remainingDeck,
 } from "@flip-7/engine";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { totalRemainingCards } from "@/lib/cardCatalog";
@@ -56,6 +57,7 @@ function errorMessage(error: unknown): string {
 export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const { state, events, dispatch, correctCard } = game;
   const router = useRouter();
+  const { id: gameId } = useParams<{ id: string }>();
   const repository = useGameRepository();
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
@@ -310,6 +312,9 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           >
             Scoreboard
           </button>
+          <Link href={`/game/${gameId}/history`} className="text-muted-foreground text-xs underline">
+            History
+          </Link>
           <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
         </div>
       </div>

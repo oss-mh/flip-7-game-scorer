@@ -4,7 +4,11 @@ import type { PlayerRoundStatus } from "@flip-7/engine";
  * Icon + label + color per status so nothing is distinguishable by colour
  * alone (#73's first acceptance criterion — colourblind-safe at a glance).
  */
-const STATUS_META: Record<PlayerRoundStatus, { readonly label: string; readonly icon: string }> = {
+/** Exported so other views (e.g. the round history table) can reuse the same icon/label without re-deciding what each status means. */
+export const STATUS_META: Record<
+  PlayerRoundStatus,
+  { readonly label: string; readonly icon: string }
+> = {
   active: { label: "In play", icon: "●" },
   stayed: { label: "Stayed", icon: "✓" },
   busted: { label: "Bust", icon: "✕" },

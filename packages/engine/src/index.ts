@@ -58,6 +58,8 @@ export type { Shuffler } from "./ports/shuffler.js";
 export { fold, initialState, reduce } from "./reduce.js";
 export type { RemainingCardCount, RemainingDeckReport } from "./remainingDeck.js";
 export { remainingDeck } from "./remainingDeck.js";
+export type { RoundHistoryEntry } from "./roundHistory.js";
+export { roundHistory } from "./roundHistory.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
 export { gameWinners, isRoundOver, legalActions, nextResolution } from "./selectors.js";
 export type { ScoreBreakdown } from "./scoring.js";
