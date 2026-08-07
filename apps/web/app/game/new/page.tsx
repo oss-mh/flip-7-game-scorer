@@ -27,6 +27,7 @@ export default function NewGamePage() {
   const [nameInput, setNameInput] = useState("");
   const [dealerId, setDealerId] = useState<string | null>(null);
   const [targetScoreInput, setTargetScoreInput] = useState(String(DEFAULT_TARGET_SCORE));
+  const [purist, setPurist] = useState(false);
   const [recentNames, setRecentNames] = useState<readonly string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -108,7 +109,13 @@ export default function NewGamePage() {
     try {
       const finalPlayers: Player[] = players.map((p) => ({ id: p.id, name: p.name.trim() }));
       const firstDealerId = dealerId ?? finalPlayers[0].id;
-      const gameId = await createGame(repository, finalPlayers, targetScore, firstDealerId);
+      const gameId = await createGame(
+        repository,
+        finalPlayers,
+        targetScore,
+        firstDealerId,
+        purist,
+      );
 
       router.push(`/game/${gameId}`);
     } catch (error) {
@@ -139,6 +146,21 @@ export default function NewGamePage() {
             value={targetScoreInput}
             onChange={(event) => setTargetScoreInput(event.target.value)}
           />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={purist}
+            onChange={(event) => setPurist(event.target.checked)}
+          />
+          <span>
+            Purist mode
+            <span className="text-muted-foreground block text-xs">
+              Hides the card counter, bust risk and Flip 7 odds, and the picker never dims
+              exhausted cards. Locked for the whole game once you start.
+            </span>
+          </span>
         </label>
 
         <div className="flex gap-2">

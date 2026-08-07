@@ -22,6 +22,7 @@ export function CardCorrectionDialog({
   playerName,
   round,
   remaining,
+  purist,
   onRemove,
   onReplace,
   onCancel,
@@ -32,6 +33,7 @@ export function CardCorrectionDialog({
   readonly playerName: string;
   readonly round: RoundState;
   readonly remaining: RemainingDeckReport;
+  readonly purist: boolean;
   readonly onRemove: () => void;
   readonly onReplace: (card: Card) => void;
   readonly onCancel: () => void;
@@ -83,6 +85,7 @@ export function CardCorrectionDialog({
             <CardPicker
               cardsDealt={round.cardsDealt}
               remaining={remaining}
+              purist={purist}
               onDeal={onReplace}
               disabled={busy}
             />

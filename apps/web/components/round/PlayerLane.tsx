@@ -34,8 +34,8 @@ export function PlayerLane({
   readonly playerRound: PlayerRoundState;
   readonly isDealer: boolean;
   readonly isCurrentPlayer: boolean;
-  /** Chance the next card dealt busts this hand (#83) — 0 for anyone not currently active. */
-  readonly bustRisk: number;
+  /** Chance the next card dealt busts this hand (#83) — null to hide it entirely (purist mode, #40). */
+  readonly bustRisk: number | null;
   readonly onSelect: () => void;
   /** Mistap correction (#74) — long-press a dealt card to remove or replace it. */
   readonly onLongPressCard?: (card: Card) => void;
@@ -155,7 +155,7 @@ export function PlayerLane({
             {!isManual &&
               `${playerRound.numberCards.length} unique number${playerRound.numberCards.length === 1 ? "" : "s"}`}
           </span>
-          {isActive && (
+          {isActive && bustRisk !== null && (
             <span
               className="text-muted-foreground text-xs"
               title="Chance the next card dealt busts this hand, from what's left in the deck"

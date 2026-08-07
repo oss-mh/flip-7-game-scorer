@@ -20,6 +20,7 @@ export function InitialDeal({
   players,
   targetPlayerId,
   remaining,
+  purist,
   onDeal,
   onSkip,
   busy,
@@ -28,6 +29,7 @@ export function InitialDeal({
   readonly players: readonly Player[];
   readonly targetPlayerId: PlayerId;
   readonly remaining: RemainingDeckReport;
+  readonly purist: boolean;
   readonly onDeal: (card: Card) => void;
   readonly onSkip: () => void;
   readonly busy: boolean;
@@ -52,6 +54,7 @@ export function InitialDeal({
       <CardPicker
         cardsDealt={round.cardsDealt}
         remaining={remaining}
+        purist={purist}
         onDeal={onDeal}
         disabled={busy}
       />

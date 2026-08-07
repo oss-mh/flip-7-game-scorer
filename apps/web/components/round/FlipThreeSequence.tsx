@@ -44,6 +44,7 @@ export function FlipThreeSequence({
   round,
   players,
   remaining,
+  purist,
   onDeal,
   busy,
 }: {
@@ -52,6 +53,7 @@ export function FlipThreeSequence({
   readonly round: RoundState;
   readonly players: readonly Player[];
   readonly remaining: RemainingDeckReport;
+  readonly purist: boolean;
   readonly onDeal: (card: Card) => void;
   readonly busy: boolean;
 }) {
@@ -80,6 +82,7 @@ export function FlipThreeSequence({
       <CardPicker
         cardsDealt={round.cardsDealt}
         remaining={remaining}
+        purist={purist}
         onDeal={onDeal}
         disabled={busy}
       />

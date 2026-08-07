@@ -44,6 +44,7 @@ function buildSampleGameState(): GameState {
     roundNumber: 1,
     currentRound: buildSampleRoundState(),
     status: "active",
+    purist: false,
   };
 }
 

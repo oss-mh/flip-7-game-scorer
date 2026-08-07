@@ -81,4 +81,6 @@ export interface GameState {
   readonly roundNumber: number;
   readonly currentRound: RoundState | null;
   readonly status: GameStatus;
+  /** Set once by `GameCreated` and never changed afterward — see #40. */
+  readonly purist: boolean;
 }

@@ -260,7 +260,13 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setActionError(null);
     setBusy(true);
     try {
-      const newGameId = await createGame(repository, state.players, state.targetScore, firstDealer.id);
+      const newGameId = await createGame(
+        repository,
+        state.players,
+        state.targetScore,
+        firstDealer.id,
+        state.purist,
+      );
       router.push(`/game/${newGameId}`);
     } catch (error) {
       setActionError(errorMessage(error));
@@ -308,7 +314,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         </div>
       </div>
 
-      <CardCounterPanel remaining={remaining} />
+      {!state.purist && <CardCounterPanel remaining={remaining} />}
 
       {flipped7Player && (
         <p
@@ -330,7 +336,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               playerRound={playerRound}
               isDealer={player.id === round.dealerId}
               isCurrentPlayer={player.id === currentPlayerId}
-              bustRisk={bustProbability(state, remaining, player.id)}
+              bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
               onSelect={() => selectPlayer(player.id)}
               onLongPressCard={(card) => {
                 setCorrectionError(null);
@@ -372,6 +378,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             round={round}
             players={state.players}
             remaining={remaining}
+            purist={state.purist}
             busy={busy}
             onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
           />
@@ -389,6 +396,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             players={state.players}
             targetPlayerId={initialDealTargetId}
             remaining={remaining}
+            purist={state.purist}
             busy={busy}
             onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
             onSkip={initialDeal.skip}
@@ -435,6 +443,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               <CardPicker
                 cardsDealt={round.cardsDealt}
                 remaining={remaining}
+                purist={state.purist}
                 onDeal={(card) => void handleHitDeal(card)}
                 disabled={busy}
               />
@@ -471,6 +480,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           playerName={correctionPlayerName}
           round={round}
           remaining={remaining}
+          purist={state.purist}
           busy={correctionBusy}
           error={correctionError}
           onRemove={() => void handleRemoveCard()}
@@ -484,6 +494,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           players={state.players}
           cumulativeScores={state.cumulativeScores}
           targetScore={state.targetScore}
+          purist={state.purist}
           onClose={() => setShowScoreboard(false)}
         />
       )}

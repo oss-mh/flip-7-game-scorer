@@ -23,6 +23,7 @@ export const initialState: GameState = {
   roundNumber: 0,
   currentRound: null,
   status: "active",
+  purist: false,
 };
 
 /**

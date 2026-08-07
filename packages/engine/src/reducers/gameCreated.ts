@@ -35,5 +35,6 @@ export function applyGameCreated(event: GameCreatedEvent): GameState {
     roundNumber: 0,
     currentRound: null,
     status: "active",
+    purist: event.purist ?? false,
   };
 }

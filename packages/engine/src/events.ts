@@ -29,6 +29,14 @@ export interface GameCreatedEvent extends EventEnvelope {
   readonly players: readonly Player[];
   /** Omit to use the rulebook default of 200 — see `DEFAULT_TARGET_SCORE`. */
   readonly targetScore?: number;
+  /**
+   * Purist mode (#40): hides remaining-card counts, bust/Flip-7
+   * probabilities and picker exhaustion dimming for the whole game. Set
+   * once here and never changed afterward — there's no event that alters
+   * it later, so it's locked for the game's duration by construction.
+   * Omit for the default of `false`.
+   */
+  readonly purist?: boolean;
 }
 
 export interface RoundStartedEvent extends EventEnvelope {
