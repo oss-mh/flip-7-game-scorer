@@ -20,6 +20,38 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Flip 7 Scorekeeper",
   description: "A local-first scorekeeper for Flip 7.",
+  appleWebApp: {
+    capable: true,
+    title: "Flip 7",
+    statusBarStyle: "black-translucent",
+    startupImage: [
+      {
+        url: "/splash/iphone-se",
+        media:
+          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone",
+        media:
+          "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone-pro-max",
+        media:
+          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/ipad",
+        media:
+          "(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/ipad-pro-11",
+        media:
+          "(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
