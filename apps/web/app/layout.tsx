@@ -40,7 +40,10 @@ export default function RootLayout({
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Flip 7 Scorekeeper
             </Link>
-            <Link href="/settings">Settings</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/stats">Stats</Link>
+              <Link href="/settings">Settings</Link>
+            </div>
           </header>
           <main className="flex flex-1 flex-col">{children}</main>
         </GameRepositoryProvider>

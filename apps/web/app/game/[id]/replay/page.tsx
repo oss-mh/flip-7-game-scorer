@@ -1,15 +1,12 @@
 "use client";
 
-import { roundHistory } from "@flip-7/engine";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { RoundHistoryTable } from "@/components/history/RoundHistoryTable";
-import { ShareSummaryButton } from "@/components/history/ShareSummaryButton";
+import { ReplayViewer } from "@/components/replay/ReplayViewer";
 import { useGame } from "@/lib/gameProvider";
-import { formatRoundHistoryText } from "@/lib/roundHistorySummary";
 
-export default function GameHistoryPage() {
+export default function GameReplayPage() {
   const { id } = useParams<{ id: string }>();
   const game = useGame();
 
@@ -43,27 +40,15 @@ export default function GameHistoryPage() {
     );
   }
 
-  const entries = roundHistory(game.events);
-
   return (
-    <div className="flex flex-1 flex-col gap-4 p-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Round history</h1>
+    <div className="flex flex-1 flex-col">
+      <div className="flex items-center justify-between p-3 pb-0">
+        <h1 className="text-xl font-semibold tracking-tight">Replay</h1>
         <Link href={`/game/${id}`} className="text-muted-foreground text-xs underline">
           Back to game
         </Link>
       </div>
-
-      {entries.length === 0 ? (
-        <p className="text-muted-foreground text-center">No rounds have been closed yet.</p>
-      ) : (
-        <>
-          <RoundHistoryTable entries={entries} players={game.state.players} />
-          <ShareSummaryButton
-            text={formatRoundHistoryText(game.state.players, game.state.targetScore, entries)}
-          />
-        </>
-      )}
+      <ReplayViewer events={game.events} />
     </div>
   );
 }

@@ -29,6 +29,10 @@ export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
 export { DomainError, SchemaMigrationError } from "./errors.js";
 export type { HitStayExpectedValue } from "./flip7Odds.js";
 export { expectedValueOfNextMove, flip7Probability } from "./flip7Odds.js";
+export type { HeadToHeadStats } from "./headToHead.js";
+export { headToHead } from "./headToHead.js";
+export type { PlayerLifetimeStats } from "./lifetimeStats.js";
+export { lifetimePlayerStats } from "./lifetimeStats.js";
 export type {
   ActionTargetedEvent,
   CardDealtEvent,
@@ -58,6 +62,9 @@ export type { Shuffler } from "./ports/shuffler.js";
 export { fold, initialState, reduce } from "./reduce.js";
 export type { RemainingCardCount, RemainingDeckReport } from "./remainingDeck.js";
 export { remainingDeck } from "./remainingDeck.js";
+export type { RoundHistoryEntry } from "./roundHistory.js";
+export { roundHistory } from "./roundHistory.js";
+export { playerRoundScores } from "./scoreDistribution.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
 export { gameWinners, isRoundOver, legalActions, nextResolution } from "./selectors.js";
 export type { ScoreBreakdown } from "./scoring.js";
