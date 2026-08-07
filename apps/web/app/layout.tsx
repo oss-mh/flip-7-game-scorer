@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 
 import { AppServiceWorker } from "@/components/AppServiceWorker";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { GameRepositoryProvider } from "@/lib/gameRepositoryContext";
 
 import type { Metadata, Viewport } from "next";
@@ -58,6 +59,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: "dark",
   themeColor: "#0a0a0c",
+  // Lets content extend under the iOS notch/home-indicator in standalone
+  // mode so the `env(safe-area-inset-*)` values in globals.css are non-zero.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -70,6 +74,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <GameRepositoryProvider>
           <AppServiceWorker />
+          <InstallPrompt />
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Flip 7 Scorekeeper

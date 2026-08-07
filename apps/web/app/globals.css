@@ -61,6 +61,21 @@ body {
 }
 
 /*
+ * Installed (standalone) mode has no browser chrome reserving space for the
+ * notch / home indicator / rounded corners, so the app has to do it itself.
+ * A normal browser tab already gets that space from the browser UI, so this
+ * is scoped to standalone only.
+ */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+}
+
+/*
  * Large touch targets are a baseline, not an afterthought — every button
  * meets the minimum tap size unless a component opts out explicitly.
  */
