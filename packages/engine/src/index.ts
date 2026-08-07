@@ -23,6 +23,7 @@ export {
   isModifierCard,
   isNumberCard,
 } from "./cards.js";
+export { bustProbability } from "./bustProbability.js";
 export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
 export { DomainError, SchemaMigrationError } from "./errors.js";
 export type {
