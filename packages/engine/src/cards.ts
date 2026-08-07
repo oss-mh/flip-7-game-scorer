@@ -111,3 +111,15 @@ export function createModifierCard(modifier: ModifierValue, copyIndex: number): 
 export function createActionCard(action: ActionType, copyIndex: number): ActionCard {
   return { id: `action-${action}-${copyIndex}`, kind: "action", action };
 }
+
+/** The inverse of `faceOfCard`: mints a concrete card for a face at the given copy index. */
+export function cardOfFace(face: CardFace, copyIndex: number): Card {
+  switch (face.kind) {
+    case "number":
+      return createNumberCard(face.value, copyIndex);
+    case "modifier":
+      return createModifierCard(face.modifier, copyIndex);
+    case "action":
+      return createActionCard(face.action, copyIndex);
+  }
+}

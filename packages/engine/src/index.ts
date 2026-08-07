@@ -14,6 +14,7 @@ export {
   CARD_FACES,
   MODIFIER_VALUES,
   NUMBER_VALUES,
+  cardOfFace,
   createActionCard,
   createModifierCard,
   createNumberCard,
@@ -26,6 +27,8 @@ export {
 export { bustProbability } from "./bustProbability.js";
 export { DECK_SIZE, createDeck, deckCountForPlayerCount } from "./deck.js";
 export { DomainError, SchemaMigrationError } from "./errors.js";
+export type { HitStayExpectedValue } from "./flip7Odds.js";
+export { expectedValueOfNextMove, flip7Probability } from "./flip7Odds.js";
 export type {
   ActionTargetedEvent,
   CardDealtEvent,
