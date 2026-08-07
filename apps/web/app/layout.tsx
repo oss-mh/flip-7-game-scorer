@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 
+import { AppServiceWorker } from "@/components/AppServiceWorker";
 import { GameRepositoryProvider } from "@/lib/gameRepositoryContext";
 
 import type { Metadata, Viewport } from "next";
@@ -68,6 +69,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <GameRepositoryProvider>
+          <AppServiceWorker />
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Flip 7 Scorekeeper

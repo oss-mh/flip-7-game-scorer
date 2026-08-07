@@ -17,6 +17,9 @@ coverage
 .next/
 /out/
 
+# generated at build time by apps/web/scripts/generate-sw-version.mjs
+apps/web/public/sw-version.json
+
 # production
 /build
 dist/
