@@ -2,6 +2,7 @@ export type {
   ActionCard,
   ActionType,
   Card,
+  CardFace,
   CardId,
   ModifierCard,
   ModifierValue,
@@ -10,11 +11,14 @@ export type {
 } from "./cards.js";
 export {
   ACTION_TYPES,
+  CARD_FACES,
   MODIFIER_VALUES,
   NUMBER_VALUES,
   createActionCard,
   createModifierCard,
   createNumberCard,
+  faceKey,
+  faceOfCard,
   isActionCard,
   isModifierCard,
   isNumberCard,
@@ -48,6 +52,8 @@ export type {
 export type { IdGenerator } from "./ports/idGenerator.js";
 export type { Shuffler } from "./ports/shuffler.js";
 export { fold, initialState, reduce } from "./reduce.js";
+export type { RemainingCardCount, RemainingDeckReport } from "./remainingDeck.js";
+export { remainingDeck } from "./remainingDeck.js";
 export type { LegalActionsResult, LegalMove } from "./selectors.js";
 export { gameWinners, isRoundOver, legalActions, nextResolution } from "./selectors.js";
 export type { ScoreBreakdown } from "./scoring.js";
