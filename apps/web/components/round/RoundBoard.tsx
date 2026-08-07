@@ -315,6 +315,9 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           <Link href={`/game/${gameId}/history`} className="text-muted-foreground text-xs underline">
             History
           </Link>
+          <Link href={`/game/${gameId}/replay`} className="text-muted-foreground text-xs underline">
+            Replay
+          </Link>
           <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
         </div>
       </div>
