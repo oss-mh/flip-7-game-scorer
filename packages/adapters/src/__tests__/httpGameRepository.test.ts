@@ -6,7 +6,14 @@ import { HttpGameRepository } from "../httpGameRepository.js";
 import { runRepositoryContractTests } from "../testing/repositoryContract.js";
 
 import type { ActionResult, GameServerActions } from "../httpGameRepository.js";
-import type { AppendResult, GameEvent, GameId, GameMeta, Snapshot, StoredEvent } from "@flip-7/engine";
+import type {
+  AppendResult,
+  GameEvent,
+  GameId,
+  GameMeta,
+  Snapshot,
+  StoredEvent,
+} from "@flip-7/engine";
 
 /**
  * An in-process stand-in for the real Server Actions
@@ -174,9 +181,9 @@ describe("HttpGameRepository error translation", () => {
     };
     const repo = new HttpGameRepository(actions);
 
-    await expect(
-      repo.appendEvents("game-1", [] as readonly GameEvent[], 0),
-    ).rejects.toThrow("That card is not a legal play right now");
+    await expect(repo.appendEvents("game-1", [] as readonly GameEvent[], 0)).rejects.toThrow(
+      "That card is not a legal play right now",
+    );
   });
 
   it("does not wrap a conflict AppendResult as an error — it's a normal return value", async () => {

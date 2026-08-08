@@ -51,10 +51,14 @@ function docker(...args: string[]): string {
 }
 
 function psql(sql: string): void {
-  execFileSync("docker", ["exec", "-i", PG_CONTAINER, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1"], {
-    input: sql,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  execFileSync(
+    "docker",
+    ["exec", "-i", PG_CONTAINER, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1"],
+    {
+      input: sql,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
 }
 
 function base64url(input: string | Buffer): string {
@@ -89,7 +93,9 @@ function jwtFor(ownerId: string): string {
  * js has no option to disable, this strips the `/rest/v1` prefix back off
  * before forwarding — a few lines of `node:http`, not a dependency.
  */
-function startRestV1Proxy(targetPort: string): Promise<{ url: string; close: () => Promise<void> }> {
+function startRestV1Proxy(
+  targetPort: string,
+): Promise<{ url: string; close: () => Promise<void> }> {
   return new Promise((resolve, reject) => {
     const prefix = "/rest/v1";
     const server = createServer((req, res) => {

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 
 import { GameRecoveryPanel } from "@/components/GameRecoveryPanel";
 import { RoundBoard } from "@/components/round/RoundBoard";
+import { SyncStatusNotice } from "@/components/SyncStatusNotice";
 import { describeEvent } from "@/lib/describeEvent";
 import { useGame } from "@/lib/gameProvider";
 
@@ -47,6 +48,7 @@ export default function GamePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-2">
+      <SyncStatusNotice gameId={id} />
       {game.lastUndone && (
         <p className="text-muted-foreground px-3 pt-2 text-sm" role="status">
           Undid: {describeEvent(game.lastUndone, game.state.players)}

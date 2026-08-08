@@ -11,6 +11,12 @@ export type { ActionErrorCode, ActionResult, GameServerActions } from "./httpGam
 export { HttpGameRepository } from "./httpGameRepository.js";
 export { InMemoryGameRepository } from "./inMemoryGameRepository.js";
 export { LocalStorageGameRepository } from "./localStorageGameRepository.js";
+export type { SyncResolution, SyncStatus, SyncStatusSource } from "./offlineQueueGameRepository.js";
+export {
+  OfflineQueueGameRepository,
+  getSyncStatus,
+  subscribeSyncStatus,
+} from "./offlineQueueGameRepository.js";
 export {
   DEFAULT_SNAPSHOT_INTERVAL,
   crossedSnapshotInterval,

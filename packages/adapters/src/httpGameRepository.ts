@@ -1,8 +1,4 @@
-import {
-  GameAlreadyExistsError,
-  GameNotFoundError,
-  StorageUnavailableError,
-} from "./errors.js";
+import { GameAlreadyExistsError, GameNotFoundError, StorageUnavailableError } from "./errors.js";
 
 import type {
   AppendResult,
