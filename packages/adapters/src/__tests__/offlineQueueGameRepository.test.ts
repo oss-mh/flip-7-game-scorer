@@ -7,9 +7,13 @@ import {
 } from "@flip-7/engine";
 import { describe, expect, it } from "vitest";
 
-import { StorageUnavailableError } from "../errors.js";
+import { GameNotFoundError, StorageUnavailableError } from "../errors.js";
 import { InMemoryGameRepository } from "../inMemoryGameRepository.js";
-import { OfflineQueueGameRepository, getSyncStatus } from "../offlineQueueGameRepository.js";
+import {
+  OfflineQueueGameRepository,
+  adoptRemoteGame,
+  getSyncStatus,
+} from "../offlineQueueGameRepository.js";
 import { runRepositoryContractTests } from "../testing/repositoryContract.js";
 
 /**
@@ -199,6 +203,61 @@ describe("OfflineQueueGameRepository", () => {
     await repo.saveSnapshot("game-1", 0, initialState);
 
     expect(remoteSnapshotCalls).toBe(0);
+  });
+
+  describe("adoptRemoteGame (#92, join-code sharing)", () => {
+    it("pulls a game only known to remote into local", async () => {
+      const local = new InMemoryGameRepository();
+      const remote = new InMemoryGameRepository();
+      const repo = new OfflineQueueGameRepository({ local, remote });
+
+      // Simulates another device's owner creating the game and this
+      // device having just redeemed its join code — remote knows it,
+      // local never has.
+      const meta = buildMeta();
+      await remote.createGame(meta);
+      const event = buildEvent(0);
+      await remote.appendEvents("game-1", [event], 0);
+
+      await adoptRemoteGame(repo, "game-1");
+
+      await expect(local.listGames()).resolves.toEqual([meta]);
+      await expect(local.loadEvents("game-1")).resolves.toEqual([event]);
+    });
+
+    it("only appends what local is missing when re-adopting an already-known game", async () => {
+      const local = new InMemoryGameRepository();
+      const remote = new InMemoryGameRepository();
+      const repo = new OfflineQueueGameRepository({ local, remote });
+
+      const meta = buildMeta();
+      await remote.createGame(meta);
+      const first = buildEvent(0);
+      const second = { ...buildEvent(1), t: "RoundStarted" as const, dealerId: "alice" };
+      await remote.appendEvents("game-1", [first], 0);
+
+      await adoptRemoteGame(repo, "game-1");
+      await expect(local.loadEvents("game-1")).resolves.toEqual([first]);
+
+      await remote.appendEvents("game-1", [second], 1);
+      await adoptRemoteGame(repo, "game-1");
+
+      await expect(local.loadEvents("game-1")).resolves.toEqual([first, second]);
+    });
+
+    it("rejects adopting a game remote doesn't know either", async () => {
+      const repo = new OfflineQueueGameRepository({
+        local: new InMemoryGameRepository(),
+        remote: new InMemoryGameRepository(),
+      });
+
+      await expect(adoptRemoteGame(repo, "missing")).rejects.toThrow(GameNotFoundError);
+    });
+
+    it("is a no-op for a plain GameRepository that doesn't support adoption", async () => {
+      const repo = new InMemoryGameRepository();
+      await expect(adoptRemoteGame(repo, "game-1")).resolves.toBeUndefined();
+    });
   });
 
   describe("conflict resolution (docs/adr/0005)", () => {

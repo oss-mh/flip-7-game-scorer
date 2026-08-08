@@ -22,6 +22,25 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 const UNIQUE_VIOLATION = "23505";
 
 /**
+ * Excludes 0/O and 1/I/L — a code that's read aloud or typed at the table
+ * shouldn't hinge on telling those apart. 6 characters over this 32-symbol
+ * alphabet is ~1 billion combinations, comfortably collision-free for this
+ * app's scale; `createGame` still retries on the rare unique-constraint hit
+ * rather than assuming it can never happen.
+ */
+const JOIN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const JOIN_CODE_LENGTH = 6;
+const MAX_JOIN_CODE_ATTEMPTS = 5;
+
+function generateJoinCode(): string {
+  let code = "";
+  for (let i = 0; i < JOIN_CODE_LENGTH; i++) {
+    code += JOIN_CODE_ALPHABET[Math.floor(Math.random() * JOIN_CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+/**
  * Not typed as `SupabaseClient<Database>` against a hand-written schema —
  * tried that first (mirroring `supabase/migrations/20260808120000_event_log_schema.sql`
  * one-for-one, standing in for `supabase gen types` since there's no live
@@ -129,20 +148,26 @@ async function withExistingGame<T>(
 export function createSupabaseGameServerActions(supabase: SupabaseGameClient): GameServerActions {
   return {
     async createGame(game: GameMeta): Promise<ActionResult<void>> {
-      const { error } = await supabase.from("games").insert({
-        id: game.id,
-        players: game.players,
-        target_score: game.targetScore,
-        created_at: game.createdAt,
-        archived_at: game.archivedAt,
-      });
-      if (error) {
+      for (let attempt = 0; attempt < MAX_JOIN_CODE_ATTEMPTS; attempt++) {
+        const { error } = await supabase.from("games").insert({
+          id: game.id,
+          players: game.players,
+          target_score: game.targetScore,
+          created_at: game.createdAt,
+          archived_at: game.archivedAt,
+          join_code: generateJoinCode(),
+        });
+        if (!error) return ok(undefined);
         if (error.code === UNIQUE_VIOLATION) {
+          // Two different unique constraints share this SQLSTATE — a
+          // colliding join code is retried with a fresh one, a colliding
+          // game id is the real "already exists" the port promises.
+          if (error.message.includes("join_code")) continue;
           return fail("already_exists", `Game "${game.id}" already exists`);
         }
         return unavailable(error);
       }
-      return ok(undefined);
+      return fail("unavailable", "Could not generate a unique join code — try again");
     },
 
     async listGames(): Promise<ActionResult<readonly GameMeta[]>> {

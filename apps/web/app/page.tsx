@@ -4,6 +4,7 @@ import { fold } from "@flip-7/engine";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { JoinGamePanel } from "@/components/JoinGamePanel";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { systemClock } from "@/lib/systemClock";
 
@@ -111,6 +112,8 @@ export default function HomePage() {
   const [state, setState] = useState<ListState>({ status: "loading" });
   const [showArchived, setShowArchived] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showJoin, setShowJoin] = useState(false);
+  const canJoin = process.env.NEXT_PUBLIC_STORAGE_ADAPTER === "http";
 
   const refresh = useCallback(() => {
     repository
@@ -143,7 +146,9 @@ export default function HomePage() {
   }
 
   function deleteGame(id: string, label: string) {
-    if (!window.confirm(`Delete "${label}"? This permanently removes the game and cannot be undone.`)) {
+    if (
+      !window.confirm(`Delete "${label}"? This permanently removes the game and cannot be undone.`)
+    ) {
       return;
     }
     void withActionErrorHandling(() => repository.deleteGame(id));
@@ -174,8 +179,16 @@ export default function HomePage() {
         <main className="flex flex-col items-center gap-4 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">Flip 7 Scorekeeper</h1>
           <p className="text-muted-foreground">No games yet — start your first one.</p>
-          <Link href="/game/new">New game</Link>
+          <div className="flex items-center gap-3">
+            <Link href="/game/new">New game</Link>
+            {canJoin && (
+              <button type="button" onClick={() => setShowJoin(true)}>
+                Join a game
+              </button>
+            )}
+          </div>
         </main>
+        {showJoin && <JoinGamePanel onClose={() => setShowJoin(false)} />}
       </div>
     );
   }
@@ -184,8 +197,20 @@ export default function HomePage() {
     <div className="flex flex-1 flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Games</h1>
-        <Link href="/game/new">New game</Link>
+        <div className="flex items-center gap-3">
+          {canJoin && (
+            <button
+              type="button"
+              className="text-muted-foreground text-sm underline"
+              onClick={() => setShowJoin(true)}
+            >
+              Join a game
+            </button>
+          )}
+          <Link href="/game/new">New game</Link>
+        </div>
       </div>
+      {showJoin && <JoinGamePanel onClose={() => setShowJoin(false)} />}
 
       {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
@@ -246,7 +271,9 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Link href={`/game/${game.id}`}>{game.status === "active" ? "Resume" : "View"}</Link>
+                <Link href={`/game/${game.id}`}>
+                  {game.status === "active" ? "Resume" : "View"}
+                </Link>
                 {game.archivedAt === null ? (
                   <button type="button" onClick={() => archiveGame(game.id)}>
                     Archive

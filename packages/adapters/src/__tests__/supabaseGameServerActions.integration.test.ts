@@ -5,13 +5,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createClient } from "@supabase/supabase-js";
-import { afterAll, beforeAll, beforeEach, describe } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { createGameSharingActions } from "../gameSharing.js";
 import { HttpGameRepository } from "../httpGameRepository.js";
 import { createSupabaseGameServerActions } from "../supabaseGameServerActions.js";
 import { runRepositoryContractTests } from "../testing/repositoryContract.js";
 
-import type { GameRepository } from "@flip-7/engine";
+import type { GameMeta, GameRepository } from "@flip-7/engine";
 
 /**
  * Runs the shared `GameRepository` contract suite — the exact same one
@@ -42,6 +43,7 @@ const PG_CONTAINER = `f7-it-pg-${process.pid}`;
 const POSTGREST_CONTAINER = `f7-it-postgrest-${process.pid}`;
 const JWT_SECRET = "test-only-secret-does-not-protect-anything-1234567890";
 const TEST_OWNER_ID = randomUUID();
+const TEST_OTHER_USER_ID = randomUUID();
 
 let postgrestUrl: string;
 let closeProxy: (() => Promise<void>) | undefined;
@@ -147,13 +149,17 @@ async function waitFor(check: () => Promise<boolean>, description: string): Prom
   throw new Error(`Timed out waiting for ${description}`);
 }
 
+/** Every migration, concatenated in filename (i.e. timestamp) order — the same order `supabase db push` would apply them in. */
 function migrationSql(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const migrationPath = path.resolve(
-    here,
-    "../../../../supabase/migrations/20260808120000_event_log_schema.sql",
-  );
-  return execFileSync("cat", [migrationPath], { encoding: "utf8" });
+  const migrationsDir = path.resolve(here, "../../../../supabase/migrations");
+  const files = execFileSync("ls", [migrationsDir], { encoding: "utf8" })
+    .split("\n")
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  return files
+    .map((name) => execFileSync("cat", [path.join(migrationsDir, name)], { encoding: "utf8" }))
+    .join("\n");
 }
 
 beforeAll(async () => {
@@ -197,7 +203,7 @@ beforeAll(async () => {
   `);
 
   psql(migrationSql());
-  psql(`insert into auth.users (id) values ('${TEST_OWNER_ID}');`);
+  psql(`insert into auth.users (id) values ('${TEST_OWNER_ID}'), ('${TEST_OTHER_USER_ID}');`);
 
   const postgrestPort = "3000";
   docker(
@@ -264,6 +270,16 @@ function makeRepo(): GameRepository {
   return new HttpGameRepository(createSupabaseGameServerActions(client));
 }
 
+function buildMeta(id: string): GameMeta {
+  return {
+    id,
+    players: [{ id: "alice", name: "Alice" }],
+    targetScore: 200,
+    createdAt: "2026-08-08T00:00:00.000Z",
+    archivedAt: null,
+  };
+}
+
 describe.sequential(
   "HttpGameRepository + createSupabaseGameServerActions (real Postgres + PostgREST)",
   () => {
@@ -276,9 +292,83 @@ describe.sequential(
     // cascade` runs as the `postgres` superuser, bypassing RLS entirely, so
     // this works regardless of which owner a given test's repo acts as.
     beforeEach(() => {
-      psql("truncate table public.games, public.game_events, public.game_snapshots cascade;");
+      psql(
+        "truncate table public.games, public.game_events, public.game_snapshots, public.game_participants cascade;",
+      );
     });
 
     runRepositoryContractTests(makeRepo);
   },
 );
+
+describe.sequential("join-code sharing (#92, real Postgres + PostgREST)", () => {
+  beforeEach(() => {
+    psql(
+      "truncate table public.games, public.game_events, public.game_snapshots, public.game_participants cascade;",
+    );
+  });
+
+  function clientFor(userId: string) {
+    return createClient(postgrestUrl, jwtFor(userId), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  it("lets a participant who redeems the code read and append events", async () => {
+    const ownerClient = clientFor(TEST_OWNER_ID);
+    const ownerRepo = new HttpGameRepository(createSupabaseGameServerActions(ownerClient));
+    await ownerRepo.createGame(buildMeta("game-1"));
+
+    const codeResult = await createGameSharingActions(ownerClient).getJoinCode("game-1");
+    if (!codeResult.ok) throw new Error(`expected ok, got ${JSON.stringify(codeResult)}`);
+    const code = codeResult.value;
+    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+
+    const participantClient = clientFor(TEST_OTHER_USER_ID);
+    await expect(createGameSharingActions(participantClient).redeemJoinCode(code)).resolves.toEqual(
+      { ok: true, value: "game-1" },
+    );
+
+    // Lowercase + stray whitespace, as a copy-paste might produce, still works.
+    await expect(
+      createGameSharingActions(participantClient).redeemJoinCode(` ${code.toLowerCase()} `),
+    ).resolves.toEqual({ ok: true, value: "game-1" });
+
+    const participantRepo = new HttpGameRepository(
+      createSupabaseGameServerActions(participantClient),
+    );
+    await expect(participantRepo.loadEvents("game-1")).resolves.toEqual([]);
+    await expect(
+      participantRepo.appendEvents(
+        "game-1",
+        [
+          {
+            schemaVersion: 1,
+            at: "2026-08-08T00:00:00.000Z",
+            seq: 1,
+            t: "GameCreated",
+            players: buildMeta("game-1").players,
+          },
+        ],
+        0,
+      ),
+    ).resolves.toEqual({ outcome: "appended", version: 1 });
+  });
+
+  it("keeps a game invisible to a user who never redeemed its code", async () => {
+    const ownerClient = clientFor(TEST_OWNER_ID);
+    const ownerRepo = new HttpGameRepository(createSupabaseGameServerActions(ownerClient));
+    await ownerRepo.createGame(buildMeta("game-1"));
+
+    const strangerRepo = new HttpGameRepository(
+      createSupabaseGameServerActions(clientFor(TEST_OTHER_USER_ID)),
+    );
+    await expect(strangerRepo.loadEvents("game-1")).rejects.toThrow();
+  });
+
+  it("rejects redeeming a code that doesn't exist", async () => {
+    const client = clientFor(TEST_OTHER_USER_ID);
+    const result = await createGameSharingActions(client).redeemJoinCode("ZZZZZZ");
+    expect(result.ok).toBe(false);
+  });
+});

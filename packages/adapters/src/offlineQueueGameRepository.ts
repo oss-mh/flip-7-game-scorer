@@ -66,6 +66,32 @@ export function subscribeSyncStatus(
   return hasSyncStatus(repo) ? repo.subscribeSyncStatus(gameId, listener) : () => {};
 }
 
+/**
+ * Duck-typed like `SyncStatusSource` (see docs/adr/0005) — pulling a game
+ * this device doesn't know about yet only means something for an adapter
+ * with a `remote` to pull it from.
+ */
+export interface RemoteGameAdopter {
+  adoptRemoteGame(gameId: GameId): Promise<void>;
+}
+
+function hasRemoteGameAdopter(repo: GameRepository): repo is GameRepository & RemoteGameAdopter {
+  return typeof (repo as Partial<RemoteGameAdopter>).adoptRemoteGame === "function";
+}
+
+/**
+ * After redeeming a join code (#92), the joining device has *access* to a
+ * game on `remote` it has never seen locally. Works on any `GameRepository`
+ * — a no-op where adoption isn't a meaningful concept (nothing to pull
+ * from without a `remote`), so callers don't need to branch on adapter
+ * type.
+ */
+export async function adoptRemoteGame(repo: GameRepository, gameId: GameId): Promise<void> {
+  if (hasRemoteGameAdopter(repo)) {
+    await repo.adoptRemoteGame(gameId);
+  }
+}
+
 function sameEvent(a: StoredEvent, b: StoredEvent): boolean {
   return a.seq === b.seq && a.t === b.t && a.at === b.at;
 }
@@ -100,7 +126,9 @@ function toMessage(error: unknown): string {
  * — see `getSyncStatus`/`subscribeSyncStatus` — not part of what any
  * method here returns or throws.
  */
-export class OfflineQueueGameRepository implements GameRepository, SyncStatusSource {
+export class OfflineQueueGameRepository
+  implements GameRepository, SyncStatusSource, RemoteGameAdopter
+{
   readonly #local: GameRepository;
   readonly #remote: GameRepository;
   readonly #statuses = new Map<GameId, SyncStatus>();
@@ -200,6 +228,41 @@ export class OfflineQueueGameRepository implements GameRepository, SyncStatusSou
       // loss, and out of scope for the event-log queue this class exists
       // for. See docs/adr/0005.
     });
+  }
+
+  /**
+   * Pulls a game this device has just gained access to (redeemed a join
+   * code for, see docs/adr/0005-adjacent #92 work) from `remote` into
+   * `local`. Safe to call again for a game already known locally — e.g.
+   * re-redeeming the same code — since it only appends whatever `local`
+   * doesn't have yet rather than assuming it's starting from empty.
+   */
+  async adoptRemoteGame(gameId: GameId): Promise<void> {
+    const remoteMetas = await this.#remote.listGames();
+    const meta = remoteMetas.find((candidate) => candidate.id === gameId);
+    if (!meta) {
+      throw new GameNotFoundError(gameId);
+    }
+    const remoteEvents = await this.#remote.loadEvents(gameId);
+
+    await this.#withLocalGuard(gameId, async () => {
+      try {
+        await this.#local.createGame(meta);
+      } catch (error) {
+        if (!(error instanceof GameAlreadyExistsError)) throw error;
+      }
+
+      const localEvents = await this.#local.loadEvents(gameId);
+      if (localEvents.length < remoteEvents.length) {
+        await this.#local.appendEvents(
+          gameId,
+          remoteEvents.slice(localEvents.length),
+          localEvents.length,
+        );
+      }
+    });
+
+    this.#setStatus(gameId, SYNCED);
   }
 
   getSyncStatus(gameId: GameId): SyncStatus {
