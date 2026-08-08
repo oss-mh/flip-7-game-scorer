@@ -20,8 +20,8 @@ export class StorageFullError extends Error {
 }
 
 export class StorageUnavailableError extends Error {
-  constructor() {
-    super("localStorage is not available in this environment");
+  constructor(message = "localStorage is not available in this environment") {
+    super(message);
     this.name = "StorageUnavailableError";
   }
 }

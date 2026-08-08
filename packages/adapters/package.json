@@ -18,12 +18,15 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@flip-7/engine": "workspace:*"
+    "@flip-7/engine": "workspace:*",
+    "@supabase/supabase-js": "^2.112.2"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "@vitest/coverage-v8": "^4.1.10",
     "typescript": "^5",
     "vitest": "^4.1.10"
