@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-import { CARD_FACES, faceKey, faceLabel, remainingCountForFace, totalRemainingCards } from "@/lib/cardCatalog";
+import {
+  CARD_FACES,
+  faceKey,
+  faceLabel,
+  remainingCountForFace,
+  totalRemainingCards,
+} from "@/lib/cardCatalog";
 
 import { CARD_KIND_CLASSES } from "./CardTile";
 
@@ -24,32 +30,52 @@ function groupByKind(): Record<CardFace["kind"], CardFace[]> {
 const SECTIONS = groupByKind();
 
 /**
- * The collapsible card counter (#39): remaining count per face, from the
- * same whole-game `remainingDeck` report (#38) the picker and each lane's
- * bust risk use — no separate app-side tally to drift out of sync with it.
- * Collapsed by default and rendered in normal document flow above the
- * lanes, never as an overlay, so it can never cover the card picker at the
- * bottom of the board (its own acceptance criterion) and never dominates
- * the screen on a fresh load either.
+ * The card counter (#39): remaining count per face, from the same
+ * whole-game `remainingDeck` report (#38) the picker and each lane's bust
+ * risk use — no separate app-side tally to drift out of sync with it.
+ *
+ * Two layouts share this component rather than duplicating the face-list
+ * markup: collapsed by default and rendered in normal document flow above
+ * the lanes on a phone-width screen (`persistent={false}`, the default),
+ * so it can never cover the card picker at the bottom of the board and
+ * never dominates the screen on a fresh load; permanently expanded with no
+ * toggle as a sidebar on tablet landscape (`persistent`), where the extra
+ * width means it doesn't have to compete with the lanes for space (#50).
  */
-export function CardCounterPanel({ remaining }: { readonly remaining: RemainingDeckReport }) {
-  const [expanded, setExpanded] = useState(false);
+export function CardCounterPanel({
+  remaining,
+  persistent = false,
+  className = "",
+}: {
+  readonly remaining: RemainingDeckReport;
+  readonly persistent?: boolean;
+  readonly className?: string;
+}) {
+  const [expandedState, setExpanded] = useState(false);
+  const expanded = persistent || expandedState;
   const total = totalRemainingCards(remaining);
   const maxRemaining = Math.max(1, ...remaining.counts.map((count) => count.remaining));
 
   return (
-    <div className="border-border bg-surface rounded-lg border">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-        className="flex min-h-0! w-full items-center justify-between gap-2 px-3 py-2 text-left"
-      >
-        <span className="text-sm font-medium">Card counter</span>
-        <span className="text-muted-foreground text-xs">
-          {total} left {expanded ? "▲" : "▼"}
-        </span>
-      </button>
+    <div className={`border-border bg-surface rounded-lg border ${className}`}>
+      {persistent ? (
+        <div className="flex w-full items-center justify-between gap-2 px-3 py-2">
+          <span className="text-sm font-medium">Card counter</span>
+          <span className="text-muted-foreground text-xs">{total} left</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        >
+          <span className="text-sm font-medium">Card counter</span>
+          <span className="text-muted-foreground text-xs">
+            {total} left {expanded ? "▲" : "▼"}
+          </span>
+        </button>
+      )}
 
       {expanded && (
         <div className="border-border flex flex-col gap-3 border-t p-3">

@@ -84,10 +84,16 @@ export function PlayerLane({
           onClick={onSelect}
           aria-pressed={isCurrentPlayer}
           className={[
-            "min-h-0! min-w-0! rounded px-1 py-0.5 text-left font-medium",
+            "flex items-center gap-1 rounded px-1 py-0.5 text-left",
+            isCurrentPlayer ? "font-semibold" : "font-medium",
             isBusted ? "text-status-busted line-through" : "",
           ].join(" ")}
         >
+          {isCurrentPlayer && (
+            <span className="text-status-active" aria-hidden="true">
+              ▶
+            </span>
+          )}
           {player.name}
           {isDealer && (
             <span

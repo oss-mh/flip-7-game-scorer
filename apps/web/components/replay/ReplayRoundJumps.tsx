@@ -24,7 +24,7 @@ export function ReplayRoundJumps({
   if (boundaries.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-muted-foreground text-xs">Round:</span>
       {boundaries.map((boundary) => (
         <button
@@ -32,9 +32,9 @@ export function ReplayRoundJumps({
           type="button"
           aria-pressed={activeRoundNumber === boundary.roundNumber}
           className={[
-            "min-h-0! min-w-0! rounded border px-2 py-1 text-xs",
+            "rounded border px-2 py-1 text-xs",
             activeRoundNumber === boundary.roundNumber
-              ? "border-status-active text-status-active"
+              ? "border-status-active text-status-active font-semibold underline"
               : "border-border text-muted-foreground",
           ].join(" ")}
           onClick={() => onJump(boundary.index)}

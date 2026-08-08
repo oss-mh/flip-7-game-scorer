@@ -9,15 +9,25 @@ import { systemClock } from "@/lib/systemClock";
 
 import type { GameMeta, GameRepository, GameState, GameStatus, Player } from "@flip-7/engine";
 
-interface GameSummary {
-  readonly id: string;
-  readonly players: readonly Player[];
-  readonly roundNumber: number;
-  readonly status: GameStatus;
-  readonly leader: { readonly name: string; readonly score: number } | null;
-  readonly lastPlayedAt: string;
-  readonly archivedAt: string | null;
-}
+type GameSummary =
+  | {
+      readonly kind: "ok";
+      readonly id: string;
+      readonly players: readonly Player[];
+      readonly roundNumber: number;
+      readonly status: GameStatus;
+      readonly leader: { readonly name: string; readonly score: number } | null;
+      readonly lastPlayedAt: string;
+      readonly archivedAt: string | null;
+    }
+  | {
+      /** A game whose own log fails to fold — the list still needs to show every other game, not hide behind one bad one. See AGENTS.md issue #86. */
+      readonly kind: "corrupted";
+      readonly id: string;
+      readonly players: readonly Player[];
+      readonly archivedAt: string | null;
+      readonly error: Error;
+    };
 
 type ListState =
   | { readonly status: "loading" }
@@ -52,25 +62,45 @@ function computeLeader(
  * snapshot alone can't provide. Fine at this app's scale (a handful to a
  * few dozen local games, not thousands); see the equivalent tradeoff note
  * in gameProvider.tsx for the same reasoning.
+ *
+ * One game's log failing to fold must never take the rest of the list down
+ * with it (`Promise.all` would otherwise reject as a whole) — caught here
+ * and represented as its own summary kind instead, so every other game
+ * still shows normally and this one gets a way back in (see the "corrupted"
+ * row below, which links to the recovery UI at `/game/[id]`).
  */
 async function summarizeGame(repository: GameRepository, meta: GameMeta): Promise<GameSummary> {
-  const events = await repository.loadEvents(meta.id);
-  const state = fold(events);
-  const lastEvent = events[events.length - 1];
+  try {
+    const events = await repository.loadEvents(meta.id);
+    const state = fold(events);
+    const lastEvent = events[events.length - 1];
 
-  return {
-    id: meta.id,
-    players: meta.players,
-    roundNumber: state.roundNumber,
-    status: state.status,
-    leader: computeLeader(state, meta.players),
-    lastPlayedAt: lastEvent ? lastEvent.at : meta.createdAt,
-    archivedAt: meta.archivedAt,
-  };
+    return {
+      kind: "ok",
+      id: meta.id,
+      players: meta.players,
+      roundNumber: state.roundNumber,
+      status: state.status,
+      leader: computeLeader(state, meta.players),
+      lastPlayedAt: lastEvent ? lastEvent.at : meta.createdAt,
+      archivedAt: meta.archivedAt,
+    };
+  } catch (error) {
+    return {
+      kind: "corrupted",
+      id: meta.id,
+      players: meta.players,
+      archivedAt: meta.archivedAt,
+      error: toError(error),
+    };
+  }
 }
 
 function sortGames(games: readonly GameSummary[]): GameSummary[] {
   return [...games].sort((a, b) => {
+    if (a.kind === "corrupted" && b.kind === "corrupted") return 0;
+    if (a.kind === "corrupted") return -1;
+    if (b.kind === "corrupted") return 1;
     if (a.status !== b.status) return a.status === "active" ? -1 : 1;
     return b.lastPlayedAt.localeCompare(a.lastPlayedAt);
   });
@@ -160,7 +190,7 @@ export default function HomePage() {
       {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
       {archivedCount > 0 && (
-        <label className="flex items-center gap-2 text-sm">
+        <label className="min-h-touch flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={showArchived}
@@ -172,7 +202,30 @@ export default function HomePage() {
 
       <ul className="flex flex-col gap-2">
         {sortGames(visibleGames).map((game) => {
-          const label = game.players.map((player) => player.name).join(", ");
+          const label = game.players.map((player) => player.name).join(", ") || "Unknown players";
+
+          if (game.kind === "corrupted") {
+            return (
+              <li
+                key={game.id}
+                className="border-status-busted flex items-center justify-between gap-4 rounded border-2 p-3"
+              >
+                <div className="flex flex-col gap-1">
+                  <span>{label}</span>
+                  <span className="text-status-busted text-sm">
+                    Couldn&apos;t load this game — {game.error.message}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href={`/game/${game.id}`}>Open to recover</Link>
+                  <button type="button" onClick={() => deleteGame(game.id, label)}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            );
+          }
+
           return (
             <li
               key={game.id}

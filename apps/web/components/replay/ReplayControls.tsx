@@ -58,7 +58,7 @@ export function ReplayControls({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="min-h-0! min-w-0! px-3 py-1.5 text-sm"
+            className="px-3 py-1.5 text-sm"
             disabled={index <= 0}
             onClick={() => onSetIndex(0)}
             aria-label="Jump to start"
@@ -67,7 +67,7 @@ export function ReplayControls({
           </button>
           <button
             type="button"
-            className="min-h-0! min-w-0! px-3 py-1.5 text-sm"
+            className="px-3 py-1.5 text-sm"
             disabled={index <= 0}
             onClick={() => onSetIndex(index - 1)}
             aria-label="Step back one event"
@@ -84,7 +84,7 @@ export function ReplayControls({
           </button>
           <button
             type="button"
-            className="min-h-0! min-w-0! px-3 py-1.5 text-sm"
+            className="px-3 py-1.5 text-sm"
             disabled={index >= total}
             onClick={() => onSetIndex(index + 1)}
             aria-label="Step forward one event"
@@ -93,7 +93,7 @@ export function ReplayControls({
           </button>
           <button
             type="button"
-            className="min-h-0! min-w-0! px-3 py-1.5 text-sm"
+            className="px-3 py-1.5 text-sm"
             disabled={index >= total}
             onClick={() => onSetIndex(total)}
             aria-label="Jump to end"

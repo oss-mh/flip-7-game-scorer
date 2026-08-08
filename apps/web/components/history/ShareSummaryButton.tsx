@@ -50,7 +50,7 @@ export function ShareSummaryButton({ text }: { readonly text: string }) {
       )}
       {(status === "unsupported" || status === "error") && (
         <details className="w-full max-w-sm">
-          <summary className="text-muted-foreground cursor-pointer text-center text-xs underline">
+          <summary className="text-muted-foreground flex min-h-touch min-w-touch cursor-pointer items-center justify-center text-center text-xs underline">
             {status === "unsupported" ? "Copy manually" : "Couldn't share — copy manually"}
           </summary>
           <textarea

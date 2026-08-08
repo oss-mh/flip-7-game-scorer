@@ -15,8 +15,12 @@ import { useEffect, useRef, useState } from "react";
 import { totalRemainingCards } from "@/lib/cardCatalog";
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
+import { triggerFeedback } from "@/lib/feedback";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
+import { buildRoundAnnouncements } from "@/lib/roundAnnouncements";
+import { buildFeedbackTriggers } from "@/lib/roundFeedback";
 import { nextDealerId } from "@/lib/turnOrder";
+import { useWakeLock } from "@/lib/useWakeLock";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
 import { CardCorrectionDialog } from "./CardCorrectionDialog";
@@ -32,12 +36,40 @@ import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { ActionCard, Card, Player, PlayerId } from "@flip-7/engine";
+import type {
+  ActionCard,
+  Card,
+  Player,
+  PlayerId,
+  PlayerRoundStatus,
+  RoundState,
+} from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Seeds the status-diff ref with whatever's already true when the board
+ * mounts (reopening the app mid-round after someone already busted, say) —
+ * without this, the first diff would compare against an empty map and see
+ * every already-busted/frozen/flipped7 player as a change happening right
+ * now, firing an announcement and a bust/freeze/Flip-7 vibration for
+ * something that isn't actually happening this render.
+ */
+function initialStatuses(
+  round: RoundState | null,
+  players: readonly Player[],
+): Map<PlayerId, PlayerRoundStatus> {
+  const statuses = new Map<PlayerId, PlayerRoundStatus>();
+  if (!round) return statuses;
+  for (const player of players) {
+    const status = round.players[player.id]?.status;
+    if (status) statuses.set(player.id, status);
+  }
+  return statuses;
 }
 
 /**
@@ -84,6 +116,51 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   } | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
+  // "In progress" ends the moment RoundClosed fires, even though `round`
+  // itself stays populated through the summary screen — see the doc
+  // comment above on why `currentRound` isn't cleared until the next round
+  // starts.
+  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
+  useWakeLock(round !== null && !justClosed);
+
+  // Screen-reader announcements (lib/roundAnnouncements.ts) and
+  // haptic/sound feedback (lib/roundFeedback.ts) for dealt cards, status
+  // changes and score updates, off the same diff. Refs, not state, for the
+  // "previous" snapshots: they exist purely to diff against next render,
+  // never to drive one themselves.
+  const previousEventsLengthRef = useRef(events.length);
+  const previousStatusesRef = useRef<Map<PlayerId, PlayerRoundStatus>>(
+    initialStatuses(round, state.players),
+  );
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    const newEvents = events.slice(previousEventsLengthRef.current);
+    previousEventsLengthRef.current = events.length;
+
+    const messages = buildRoundAnnouncements({
+      newEvents,
+      players: state.players,
+      round,
+      previousStatuses: previousStatusesRef.current,
+      cumulativeScores: state.cumulativeScores,
+    });
+    if (messages.length > 0) setAnnouncement(messages.join(" "));
+
+    const triggers = buildFeedbackTriggers({
+      newEvents,
+      players: state.players,
+      round,
+      previousStatuses: previousStatusesRef.current,
+    });
+    for (const trigger of triggers) triggerFeedback(trigger);
+
+    const nextStatuses = new Map<PlayerId, PlayerRoundStatus>();
+    for (const player of state.players) {
+      const status = round?.players[player.id]?.status;
+      if (status) nextStatuses.set(player.id, status);
+    }
+    previousStatusesRef.current = nextStatuses;
+  }, [events, round, state.players, state.cumulativeScores]);
 
   if (!round) {
     return (
@@ -95,7 +172,6 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   const pending = nextResolution(state);
   const roundOver = isRoundOver(state);
-  const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   const currentLegal = currentPlayerId ? legalActions(state, currentPlayerId) : null;
   const unusedSecondChanceHolders = state.players
     .filter((player) => round.players[player.id]?.heldSecondChance)
@@ -302,17 +378,23 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-3">
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Round {round.roundNumber}</h1>
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+            className="text-muted-foreground flex items-center justify-center text-xs underline"
             onClick={() => setShowScoreboard(true)}
           >
             Scoreboard
           </button>
-          <Link href={`/game/${gameId}/history`} className="text-muted-foreground text-xs underline">
+          <Link
+            href={`/game/${gameId}/history`}
+            className="text-muted-foreground text-xs underline"
+          >
             History
           </Link>
           <Link href={`/game/${gameId}/replay`} className="text-muted-foreground text-xs underline">
@@ -322,163 +404,184 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         </div>
       </div>
 
-      {!state.purist && <CardCounterPanel remaining={remaining} />}
+      {/*
+       * Tablet landscape gets a second column rather than just wider
+       * single-column flow (#50): the counter panel moves out of the
+       * document flow above the lanes and becomes a persistent sidebar,
+       * so it doesn't cost lane width or need a collapse toggle once
+       * there's room to show it permanently.
+       */}
+      <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {!state.purist && <CardCounterPanel remaining={remaining} className="lg:hidden" />}
 
-      {flipped7Player && (
-        <p
-          role="status"
-          className="border-status-flipped7 bg-status-flipped7/10 text-status-flipped7 animate-pulse rounded-lg border-2 p-2 text-center font-semibold"
-        >
-          ★ {flipped7Player.name} flipped 7! Round over for everyone. ★
-        </p>
-      )}
+          {flipped7Player && (
+            <p
+              role="status"
+              className="border-status-flipped7 bg-status-flipped7/10 text-status-flipped7 animate-pulse rounded-lg border-2 p-2 text-center font-semibold"
+            >
+              ★ {flipped7Player.name} flipped 7! Round over for everyone. ★
+            </p>
+          )}
 
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {state.players.map((player) => {
-          const playerRound = round.players[player.id];
-          if (!playerRound) return null;
-          return (
-            <PlayerLane
-              key={player.id}
-              player={player}
-              playerRound={playerRound}
-              isDealer={player.id === round.dealerId}
-              isCurrentPlayer={player.id === currentPlayerId}
-              bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
-              onSelect={() => selectPlayer(player.id)}
-              onLongPressCard={(card) => {
-                setCorrectionError(null);
-                setCorrectionTarget({ playerId: player.id, card });
-              }}
-            />
-          );
-        })}
-      </ul>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {state.players.map((player) => {
+              const playerRound = round.players[player.id];
+              if (!playerRound) return null;
+              return (
+                <PlayerLane
+                  key={player.id}
+                  player={player}
+                  playerRound={playerRound}
+                  isDealer={player.id === round.dealerId}
+                  isCurrentPlayer={player.id === currentPlayerId}
+                  bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
+                  onSelect={() => selectPlayer(player.id)}
+                  onLongPressCard={(card) => {
+                    setCorrectionError(null);
+                    setCorrectionTarget({ playerId: player.id, card });
+                  }}
+                />
+              );
+            })}
+          </ul>
 
-      {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
+          {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
-      {canEnterManualMode && !manualMode && !roundOver && !pending && (
-        <button
-          type="button"
-          className="text-muted-foreground min-h-0! min-w-0! self-center text-xs underline"
-          onClick={handleEnterManualMode}
-        >
-          Enter scores manually instead
-        </button>
-      )}
+          {canEnterManualMode && !manualMode && !roundOver && !pending && (
+            <button
+              type="button"
+              className="text-muted-foreground self-center text-xs underline"
+              onClick={handleEnterManualMode}
+            >
+              Enter scores manually instead
+            </button>
+          )}
 
-      <div className="mt-auto flex flex-col gap-3">
-        {pending?.kind === "awaiting-target" ? (
-          <ActionTargetPrompt
-            card={pending.card}
-            sourcePlayerId={pending.sourcePlayerId}
-            round={round}
-            players={state.players}
-            busy={busy}
-            onResolve={(targetId) =>
-              void handleResolveTarget(pending.card, pending.sourcePlayerId, targetId)
-            }
-          />
-        ) : pending?.kind === "forced-draw-remaining" ? (
-          <FlipThreeSequence
-            resolution={pending}
-            upNext={round.pendingResolutions.slice(1)}
-            round={round}
-            players={state.players}
-            remaining={remaining}
-            purist={state.purist}
-            busy={busy}
-            onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
-          />
-        ) : manualMode ? (
-          <ManualScoreEntry
-            round={round}
-            players={state.players}
-            busy={busy}
-            onSubmit={(scores) => void handleManualScores(scores)}
-            onCancel={() => setManualMode(false)}
-          />
-        ) : initialDeal.active && initialDealTargetId ? (
-          <InitialDeal
-            round={round}
-            players={state.players}
-            targetPlayerId={initialDealTargetId}
-            remaining={remaining}
-            purist={state.purist}
-            busy={busy}
-            onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
-            onSkip={initialDeal.skip}
-          />
-        ) : justClosed ? (
-          <RoundSummary
-            round={round}
-            players={state.players}
-            cumulativeScores={state.cumulativeScores}
-            busy={busy}
-            gameOver={gameOver}
-            winners={winners}
-            nextDealer={nextDealer}
-            deckExhausted={deckExhausted}
-            onContinue={() => void handleStartNextRound()}
-            onRematch={() => void handleRematch()}
-          />
-        ) : roundOver ? (
-          <div className="flex flex-col items-center gap-2">
-            {unusedSecondChanceHolders.length > 0 && (
-              <p className="text-card-action text-center text-xs">
-                Unused Second Chance{unusedSecondChanceHolders.length > 1 ? "s" : ""} —{" "}
-                {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
-                Close round
-              </button>
-              {isManualRound && (
-                <button
-                  type="button"
-                  className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
-                  onClick={() => setManualMode(true)}
-                >
-                  Edit scores
-                </button>
-              )}
-            </div>
-          </div>
-        ) : currentPlayerId && currentLegal ? (
-          <>
-            {showPicker ? (
-              <CardPicker
-                cardsDealt={round.cardsDealt}
+          <div className="mt-auto flex flex-col gap-3">
+            {pending?.kind === "awaiting-target" ? (
+              <ActionTargetPrompt
+                card={pending.card}
+                sourcePlayerId={pending.sourcePlayerId}
+                round={round}
+                players={state.players}
+                busy={busy}
+                onResolve={(targetId) =>
+                  void handleResolveTarget(pending.card, pending.sourcePlayerId, targetId)
+                }
+              />
+            ) : pending?.kind === "forced-draw-remaining" ? (
+              <FlipThreeSequence
+                resolution={pending}
+                upNext={round.pendingResolutions.slice(1)}
+                round={round}
+                players={state.players}
                 remaining={remaining}
                 purist={state.purist}
-                onDeal={(card) => void handleHitDeal(card)}
-                disabled={busy}
+                busy={busy}
+                onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
               />
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1"
-                  disabled={busy || !currentLegal.moves.includes("hit")}
-                  onClick={() => setShowPicker(true)}
-                >
-                  Hit
-                </button>
-                <button
-                  type="button"
-                  className="flex-1"
-                  disabled={busy || !currentLegal.moves.includes("stay")}
-                  onClick={() => void handleStay()}
-                  title={currentLegal.reasons.stay}
-                >
-                  Stay
-                </button>
+            ) : manualMode ? (
+              <ManualScoreEntry
+                round={round}
+                players={state.players}
+                busy={busy}
+                onSubmit={(scores) => void handleManualScores(scores)}
+                onCancel={() => setManualMode(false)}
+              />
+            ) : initialDeal.active && initialDealTargetId ? (
+              <InitialDeal
+                round={round}
+                players={state.players}
+                targetPlayerId={initialDealTargetId}
+                remaining={remaining}
+                purist={state.purist}
+                busy={busy}
+                onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
+                onSkip={initialDeal.skip}
+              />
+            ) : justClosed ? (
+              <RoundSummary
+                round={round}
+                players={state.players}
+                cumulativeScores={state.cumulativeScores}
+                busy={busy}
+                gameOver={gameOver}
+                winners={winners}
+                nextDealer={nextDealer}
+                deckExhausted={deckExhausted}
+                onContinue={() => void handleStartNextRound()}
+                onRematch={() => void handleRematch()}
+              />
+            ) : roundOver ? (
+              <div className="flex flex-col items-center gap-2">
+                {unusedSecondChanceHolders.length > 0 && (
+                  <p className="text-card-action text-center text-xs">
+                    Unused Second Chance{unusedSecondChanceHolders.length > 1 ? "s" : ""} —{" "}
+                    {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
+                    Close round
+                  </button>
+                  {isManualRound && (
+                    <button
+                      type="button"
+                      className="text-muted-foreground text-xs underline"
+                      onClick={() => setManualMode(true)}
+                    >
+                      Edit scores
+                    </button>
+                  )}
+                </div>
               </div>
+            ) : currentPlayerId && currentLegal ? (
+              <>
+                {showPicker ? (
+                  <CardPicker
+                    cardsDealt={round.cardsDealt}
+                    remaining={remaining}
+                    purist={state.purist}
+                    onDeal={(card) => void handleHitDeal(card)}
+                    disabled={busy}
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1"
+                      disabled={busy || !currentLegal.moves.includes("hit")}
+                      onClick={() => setShowPicker(true)}
+                    >
+                      Hit
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1"
+                      disabled={busy || !currentLegal.moves.includes("stay")}
+                      onClick={() => void handleStay()}
+                      title={currentLegal.reasons.stay}
+                    >
+                      Stay
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-center text-sm">
+                Waiting for an active player…
+              </p>
             )}
-          </>
-        ) : (
-          <p className="text-muted-foreground text-center text-sm">Waiting for an active player…</p>
+          </div>
+        </div>
+
+        {!state.purist && (
+          <CardCounterPanel
+            remaining={remaining}
+            persistent
+            className="hidden lg:block lg:w-72 lg:shrink-0"
+          />
         )}
       </div>
 

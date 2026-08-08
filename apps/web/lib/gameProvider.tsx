@@ -1,6 +1,6 @@
 "use client";
 
-import { maybeSaveSnapshot } from "@flip-7/adapters";
+import { loadGameState, maybeSaveSnapshot } from "@flip-7/adapters";
 import { EVENT_SCHEMA_VERSION, fold, reduce } from "@flip-7/engine";
 import {
   createContext,
@@ -15,14 +15,7 @@ import {
 import { useGameRepository } from "./gameRepositoryContext";
 import { systemClock } from "./systemClock";
 
-import type {
-  Card,
-  CardDealtEvent,
-  GameEvent,
-  GameId,
-  GameRepository,
-  GameState,
-} from "@flip-7/engine";
+import type { Card, CardDealtEvent, GameEvent, GameId, GameState } from "@flip-7/engine";
 import type { ReactNode } from "react";
 
 /** A `GameEvent` minus the envelope fields `dispatch` fills in itself. */
@@ -35,14 +28,6 @@ function toError(value: unknown): Error {
 
 function toEvent(command: GameCommand, seq: number, at: string): GameEvent {
   return { ...command, schemaVersion: EVENT_SCHEMA_VERSION, at, seq } as GameEvent;
-}
-
-async function loadFullGameLog(
-  repository: GameRepository,
-  gameId: GameId,
-): Promise<{ state: GameState; events: readonly GameEvent[] }> {
-  const events = await repository.loadEvents(gameId);
-  return { state: fold(events), events };
 }
 
 /**
@@ -62,19 +47,46 @@ function undoFloor(events: readonly GameEvent[]): number {
 
 type LoadedData =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly error: Error }
+  | { readonly status: "error"; readonly error: Error; readonly events: readonly GameEvent[] | null }
+  | {
+      readonly status: "degraded";
+      readonly state: GameState;
+      readonly events: readonly GameEvent[];
+      readonly error: Error;
+    }
   | { readonly status: "empty" }
   | { readonly status: "ready"; readonly state: GameState; readonly events: readonly GameEvent[] };
 
 /**
  * What `useGame()` returns. `dispatch`/`undo`/`redo` only exist on the
  * `ready` variant — there's nothing to act on otherwise — and `retry` only
- * on the recoverable `error`/`empty` variants. See AGENTS.md acceptance
- * criteria, "Loading, error and empty states handled explicitly".
+ * on the recoverable `error`/`degraded`/`empty` variants. See AGENTS.md
+ * acceptance criteria, "Loading, error and empty states handled
+ * explicitly".
+ *
+ * `degraded` sits between `error` and `ready`: the full event log doesn't
+ * replay, but a compatible snapshot (plus however much of its own tail
+ * still replays) does, so there's a real if possibly-stale `state` to show
+ * rather than a dead end — see `loadGameState` in `@flip-7/adapters` and
+ * AGENTS.md design priorities, "Never lose someone's scores". It's
+ * deliberately not made to look like `ready`: no `dispatch`, so nothing
+ * gets appended on top of a state the log itself couldn't fully confirm.
  */
 export type GameQuery =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly error: Error; readonly retry: () => void }
+  | {
+      readonly status: "error";
+      readonly error: Error;
+      readonly events: readonly GameEvent[] | null;
+      readonly retry: () => void;
+    }
+  | {
+      readonly status: "degraded";
+      readonly state: GameState;
+      readonly events: readonly GameEvent[];
+      readonly error: Error;
+      readonly retry: () => void;
+    }
   | { readonly status: "empty"; readonly retry: () => void }
   | {
       readonly status: "ready";
@@ -147,14 +159,42 @@ function GameProviderSession({
   useEffect(() => {
     let cancelled = false;
 
-    loadFullGameLog(repository, gameId)
-      .then(({ state, events }) => {
+    repository
+      .loadEvents(gameId)
+      .then((events) => {
         if (cancelled) return;
+
+        let state: GameState;
+        try {
+          state = fold(events);
+        } catch (foldError) {
+          // The full log doesn't replay — don't show a blank screen while
+          // that gets sorted out. Fall back to the last compatible
+          // snapshot plus whatever of its own tail still replays, so the
+          // table can at least see where things stood a moment ago. See
+          // AGENTS.md design priorities, "Never lose someone's scores".
+          loadGameState(repository, gameId)
+            .then((degradedState) => {
+              if (cancelled) return;
+              setData({
+                status: "degraded",
+                state: degradedState,
+                events,
+                error: toError(foldError),
+              });
+            })
+            .catch(() => {
+              if (cancelled) return;
+              setData({ status: "error", error: toError(foldError), events });
+            });
+          return;
+        }
+
         setData(events.length === 0 ? { status: "empty" } : { status: "ready", state, events });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setData({ status: "error", error: toError(error) });
+        setData({ status: "error", error: toError(error), events: null });
       });
 
     return () => {
@@ -345,7 +385,15 @@ function GameProviderSession({
       case "loading":
         return { status: "loading" };
       case "error":
-        return { status: "error", error: data.error, retry };
+        return { status: "error", error: data.error, events: data.events, retry };
+      case "degraded":
+        return {
+          status: "degraded",
+          state: data.state,
+          events: data.events,
+          error: data.error,
+          retry,
+        };
       case "empty":
         return { status: "empty", retry };
       case "ready":
