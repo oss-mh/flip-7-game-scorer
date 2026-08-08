@@ -31,16 +31,23 @@ create index games_owner_id_idx on public.games (owner_id);
 -- or delete policy, and no update/delete grant, on this table — see the RLS
 -- section below. AGENTS.md invariant #4, "the event log is append-only", is
 -- enforced here at the database, not only by adapter convention.
+-- `seq` here is a storage position assigned by this adapter (0-indexed,
+-- derived from `expectedVersion` — see `append_game_events` below), not the
+-- same thing as the `seq` field inside the event JSON itself. `GameEvent`'s
+-- own envelope `seq` (events.ts) is caller-assigned, opaque application
+-- data as far as this port is concerned — `InMemoryGameRepository` and
+-- `LocalStorageGameRepository` never look at it either, they just track
+-- array position. Deliberately not constrained to match: the shared
+-- contract test suite (packages/adapters/src/testing/repositoryContract.ts)
+-- exercises `appendEvents` with payload `seq` values that don't correspond
+-- to storage position, and every adapter — this one included — must accept
+-- them unchanged for that suite to stay adapter-agnostic.
 create table public.game_events (
   game_id uuid not null references public.games (id) on delete cascade,
   seq integer not null,
   event jsonb not null,
   inserted_at timestamptz not null default now(),
-  primary key (game_id, seq),
-  -- Every event's own envelope carries a `seq` too (see events.ts). This
-  -- keeps the column — which is what the unique constraint and ordering
-  -- actually rely on — from silently drifting apart from the payload.
-  constraint game_events_seq_matches_payload check ((event ->> 'seq')::integer = seq)
+  primary key (game_id, seq)
 );
 
 -- One row per game: `saveSnapshot` overwrites rather than accumulates (see
