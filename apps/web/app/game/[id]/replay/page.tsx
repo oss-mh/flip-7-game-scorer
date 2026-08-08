@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
+import { GameRecoveryPanel } from "@/components/GameRecoveryPanel";
 import { ReplayViewer } from "@/components/replay/ReplayViewer";
 import { useGame } from "@/lib/gameProvider";
 
@@ -19,13 +20,17 @@ export default function GameReplayPage() {
   }
 
   if (game.status === "error") {
+    return <GameRecoveryPanel error={game.error} gameId={id} onReload={game.retry} />;
+  }
+
+  if (game.status === "degraded") {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <main className="flex flex-col items-center gap-2 text-center">
-          <p className="text-status-busted">{game.error.message}</p>
-          <button onClick={game.retry}>Retry</button>
-        </main>
-      </div>
+      <GameRecoveryPanel
+        error={game.error}
+        gameId={id}
+        degradedState={game.state}
+        onReload={game.retry}
+      />
     );
   }
 
