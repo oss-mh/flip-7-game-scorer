@@ -13,13 +13,34 @@
 -- later — anonymous sign-in gives every session a stable `auth.uid()` from
 -- the start.
 
+-- `id` is `text`, not `uuid`, even though every real caller
+-- (`systemIdGenerator`, apps/web/lib/systemIdGenerator.ts) happens to hand
+-- it a `crypto.randomUUID()` string: `GameId` (packages/engine/src/ports/gameRepository.ts)
+-- is an opaque string as far as the port is concerned, and the shared
+-- contract test suite deliberately uses non-UUID ids like "game-1" and
+-- "missing" to prove no adapter secretly depends on the format. A `uuid`
+-- column rejects those with "invalid input syntax for type uuid" — caught
+-- by running the contract suite against a real Postgres in
+-- supabaseGameServerActions.integration.test.ts, the same class of bug as
+-- the `seq`/payload mismatch above.
+-- `created_at`/`archived_at` are `text`, not `timestamptz`, for the same
+-- round-trip reason `id` is `text` and `seq` isn't checked against the
+-- payload: `GameMeta.createdAt`/`archivedAt` are caller-supplied ISO-8601
+-- strings the port contract expects back byte-for-byte (InMemory and
+-- LocalStorage just hold the reference). `timestamptz` normalizes on the
+-- way out — PostgREST serializes it back as `2026-01-01T00:00:00+00:00`,
+-- not the original `...000Z` — semantically the same instant, but not the
+-- string equality the contract suite's `toEqual` checks. Caught by the
+-- same integration test as the other two. Safe to keep sorting
+-- `listGames` by this column: every real caller uses `Date.toISOString()`
+-- formatting, which sorts lexicographically identical to chronologically.
 create table public.games (
-  id uuid primary key,
+  id text primary key,
   owner_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   players jsonb not null,
   target_score integer not null,
-  created_at timestamptz not null,
-  archived_at timestamptz,
+  created_at text not null,
+  archived_at text,
   inserted_at timestamptz not null default now()
 );
 
@@ -43,7 +64,7 @@ create index games_owner_id_idx on public.games (owner_id);
 -- to storage position, and every adapter — this one included — must accept
 -- them unchanged for that suite to stay adapter-agnostic.
 create table public.game_events (
-  game_id uuid not null references public.games (id) on delete cascade,
+  game_id text not null references public.games (id) on delete cascade,
   seq integer not null,
   event jsonb not null,
   inserted_at timestamptz not null default now(),
@@ -54,7 +75,7 @@ create table public.game_events (
 -- the contract test "overwrites a previous snapshot rather than keeping
 -- both"), so `game_id` as the primary key makes that an upsert for free.
 create table public.game_snapshots (
-  game_id uuid primary key references public.games (id) on delete cascade,
+  game_id text primary key references public.games (id) on delete cascade,
   version integer not null,
   schema_version integer not null,
   state jsonb not null,
@@ -134,7 +155,7 @@ create policy "update own game snapshots" on public.game_snapshots
 -- `security invoker` deliberately, so the ownership check comes from the
 -- RLS insert policy above, not from this function trusting its caller.
 create or replace function public.append_game_events(
-  p_game_id uuid,
+  p_game_id text,
   p_events jsonb,
   p_expected_version integer
 )
@@ -164,7 +185,7 @@ exception
 end;
 $$;
 
-grant execute on function public.append_game_events(uuid, jsonb, integer) to authenticated;
+grant execute on function public.append_game_events(text, jsonb, integer) to authenticated;
 
 -- Sanctioned truncation -----------------------------------------------------
 -- The one non-append write this log ever takes — AGENTS.md invariant #4:
@@ -173,7 +194,7 @@ grant execute on function public.append_game_events(uuid, jsonb, integer) to aut
 -- or policy on `game_events`/`game_snapshots` for anything else to use —
 -- this function is the only door, and it checks ownership itself before it
 -- deletes anything.
-create or replace function public.truncate_game_events(p_game_id uuid, p_to_version integer)
+create or replace function public.truncate_game_events(p_game_id text, p_to_version integer)
 returns void
 language plpgsql
 security definer
@@ -191,4 +212,4 @@ begin
 end;
 $$;
 
-grant execute on function public.truncate_game_events(uuid, integer) to authenticated;
+grant execute on function public.truncate_game_events(text, integer) to authenticated;
