@@ -116,6 +116,7 @@ packages/engine/       Pure rules, events, scoring, port interfaces
 packages/adapters/     Concrete storage implementations
 docs/adr/              Architecture decision records
 scripts/               Repo tooling, including the issue bootstrap script
+supabase/migrations/   SQL migrations for the remote GameRepository (M10)
 ```
 
 ### Two rules that must hold
