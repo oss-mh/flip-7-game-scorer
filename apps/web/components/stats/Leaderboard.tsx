@@ -41,7 +41,7 @@ export function Leaderboard({
               <td className="p-2">
                 <button
                   type="button"
-                  className="min-h-0! min-w-0! text-left font-medium underline"
+                  className="text-left font-medium underline"
                   onClick={() => onSelectPlayer(entry.name)}
                 >
                   {entry.name}

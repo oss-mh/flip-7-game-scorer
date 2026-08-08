@@ -160,7 +160,7 @@ export default function HomePage() {
       {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
       {archivedCount > 0 && (
-        <label className="flex items-center gap-2 text-sm">
+        <label className="min-h-touch flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={showArchived}

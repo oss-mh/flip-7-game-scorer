@@ -10,7 +10,12 @@
   --background: #0a0a0c;
   --foreground: #f4f4f5;
   --surface: #18181b;
-  --border: #2b2b31;
+  /* 3.57:1 against --background, 3.20:1 against --surface — WCAG 1.4.11
+   * non-text contrast (AA) needs 3:1 against whichever it's drawn over,
+   * and this is the only visible boundary on a few elements (player lane
+   * cards, a couple of dialogs) with no fill color of their own to
+   * delineate them instead. See scripts/check-contrast.mjs. */
+  --border: #68686e;
   --muted-foreground: #a1a1aa;
 
   /* Card type accents — mirrors packages/engine `Card["kind"]`. */
@@ -77,10 +82,22 @@ body {
 
 /*
  * Large touch targets are a baseline, not an afterthought — every button
- * meets the minimum tap size unless a component opts out explicitly.
+ * or link meets the minimum tap size unless a component opts out
+ * explicitly. `a` defaults to `display: inline`, which `min-height` and
+ * `min-width` have no effect on, so every link in this app is switched to
+ * `inline-flex` here too — every one is a standalone navigation action,
+ * never an inline link inside a sentence of prose.
  */
 @layer base {
   button {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-height: var(--touch-target);
     min-width: var(--touch-target);
   }

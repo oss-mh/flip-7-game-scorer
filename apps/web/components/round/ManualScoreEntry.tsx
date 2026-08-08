@@ -84,7 +84,7 @@ export function ManualScoreEntry({
         <span className="text-muted-foreground text-xs">Enter each player&apos;s round score</span>
         <button
           type="button"
-          className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+          className="text-muted-foreground text-xs underline"
           onClick={onCancel}
         >
           Back to tracked play
@@ -105,7 +105,10 @@ export function ManualScoreEntry({
                 isActive ? "border-status-manual" : "border-border",
               ].join(" ")}
             >
-              <span className="text-foreground text-xs">{playerName(players, playerId)}</span>
+              <span className="text-foreground flex items-center gap-1 text-xs">
+                {isActive && <span aria-hidden="true">✎</span>}
+                {playerName(players, playerId)}
+              </span>
               <span className="text-lg font-semibold tabular-nums">{values[playerId] ?? "–"}</span>
             </button>
           );

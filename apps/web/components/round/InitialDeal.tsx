@@ -42,7 +42,7 @@ export function InitialDeal({
         </p>
         <button
           type="button"
-          className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+          className="text-muted-foreground text-xs underline"
           onClick={onSkip}
         >
           Skip guided deal

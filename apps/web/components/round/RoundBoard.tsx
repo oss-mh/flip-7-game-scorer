@@ -16,6 +16,7 @@ import { totalRemainingCards } from "@/lib/cardCatalog";
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
+import { buildRoundAnnouncements } from "@/lib/roundAnnouncements";
 import { nextDealerId } from "@/lib/turnOrder";
 import { useWakeLock } from "@/lib/useWakeLock";
 
@@ -33,7 +34,7 @@ import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { ActionCard, Card, Player, PlayerId } from "@flip-7/engine";
+import type { ActionCard, Card, Player, PlayerId, PlayerRoundStatus } from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
@@ -91,6 +92,34 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   // starts.
   const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   useWakeLock(round !== null && !justClosed);
+
+  // Screen-reader announcements for dealt cards, status changes and score
+  // updates — see lib/roundAnnouncements.ts. Refs, not state, for the
+  // "previous" snapshots: they exist purely to diff against next render,
+  // never to drive one themselves.
+  const previousEventsLengthRef = useRef(events.length);
+  const previousStatusesRef = useRef<Map<PlayerId, PlayerRoundStatus>>(new Map());
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    const newEvents = events.slice(previousEventsLengthRef.current);
+    previousEventsLengthRef.current = events.length;
+
+    const messages = buildRoundAnnouncements({
+      newEvents,
+      players: state.players,
+      round,
+      previousStatuses: previousStatusesRef.current,
+      cumulativeScores: state.cumulativeScores,
+    });
+    if (messages.length > 0) setAnnouncement(messages.join(" "));
+
+    const nextStatuses = new Map<PlayerId, PlayerRoundStatus>();
+    for (const player of state.players) {
+      const status = round?.players[player.id]?.status;
+      if (status) nextStatuses.set(player.id, status);
+    }
+    previousStatusesRef.current = nextStatuses;
+  }, [events, round, state.players, state.cumulativeScores]);
 
   if (!round) {
     return (
@@ -308,12 +337,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-3">
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Round {round.roundNumber}</h1>
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+            className="text-muted-foreground flex items-center justify-center text-xs underline"
             onClick={() => setShowScoreboard(true)}
           >
             Scoreboard
@@ -366,7 +398,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
       {canEnterManualMode && !manualMode && !roundOver && !pending && (
         <button
           type="button"
-          className="text-muted-foreground min-h-0! min-w-0! self-center text-xs underline"
+          className="text-muted-foreground self-center text-xs underline"
           onClick={handleEnterManualMode}
         >
           Enter scores manually instead
@@ -443,7 +475,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
               {isManualRound && (
                 <button
                   type="button"
-                  className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+                  className="text-muted-foreground text-xs underline"
                   onClick={() => setManualMode(true)}
                 >
                   Edit scores

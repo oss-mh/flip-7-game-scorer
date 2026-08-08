@@ -3,6 +3,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 import importX from "eslint-plugin-import-x";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import tseslint from "typescript-eslint";
 
 // Applies to every workspace: TypeScript-aware import ordering. Uses the
@@ -162,6 +163,14 @@ const webConfig = defineConfig({
     "import-x/internal-regex": "^@/",
   },
   rules: {
+    // `nextCoreWebVitals` already registers the jsx-a11y plugin itself, but
+    // only wires up a handful of its ARIA-shape rules — spreading in the
+    // rest of `recommended` here (rules only, not the whole config object,
+    // which would try to re-register the same plugin key and fail) adds
+    // the interaction/keyboard rules that actually enforce AGENTS.md's
+    // "full keyboard navigation" requirement.
+    ...jsxA11y.flatConfigs.recommended.rules,
+
     // apps/web must resolve concrete storage adapter *classes* at a single
     // composition root, never elsewhere — see AGENTS.md, "apps/web never
     // imports a concrete adapter". Everything else `@flip-7/adapters`

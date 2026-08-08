@@ -77,7 +77,7 @@ export function RoundHistoryTable({
                     <td key={player.id} className="p-1 text-right align-top">
                       <button
                         type="button"
-                        className="min-h-0! min-w-0! hover:bg-border/40 flex w-full flex-col items-end gap-0.5 rounded-md p-1.5"
+                        className="hover:bg-border/40 flex w-full flex-col items-end justify-center gap-0.5 rounded-md p-1.5"
                         onClick={() =>
                           setSelection({ roundNumber: entry.round.roundNumber, playerId: player.id })
                         }

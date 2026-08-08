@@ -52,7 +52,7 @@ export default function SettingsPage() {
           Stops the screen from dimming or locking while a round is in progress. Releases
           automatically between rounds and when you leave the game.
         </p>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="min-h-touch flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={wakeLockEnabled}

@@ -47,16 +47,16 @@ function PlayerPicker({
   return (
     <div className="flex flex-col gap-1">
       <span className="text-muted-foreground text-xs">{label}</span>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-2">
         {players.map((player) => (
           <button
             key={player.name}
             type="button"
             aria-pressed={selected === player.name}
             className={[
-              "min-h-0! min-w-0! rounded border px-2 py-1 text-xs",
+              "rounded border px-2 py-1 text-xs",
               selected === player.name
-                ? "border-status-active text-status-active"
+                ? "border-status-active text-status-active font-semibold underline"
                 : "border-border text-muted-foreground",
             ].join(" ")}
             onClick={() => onSelect(player.name)}

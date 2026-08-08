@@ -71,7 +71,7 @@ export function CardPicker({
             aria-pressed={overrideEnabled}
             onClick={() => setOverrideEnabled((value) => !value)}
             className={[
-              "min-h-0! min-w-0! rounded px-2 py-1 text-xs",
+              "rounded px-2 py-1 text-xs",
               overrideEnabled ? "bg-status-busted/20 text-status-busted" : "text-muted-foreground",
             ].join(" ")}
           >

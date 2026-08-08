@@ -43,7 +43,7 @@ export function CardCounterPanel({ remaining }: { readonly remaining: RemainingD
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
-        className="flex min-h-0! w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
       >
         <span className="text-sm font-medium">Card counter</span>
         <span className="text-muted-foreground text-xs">

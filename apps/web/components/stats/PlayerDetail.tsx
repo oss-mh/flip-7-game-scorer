@@ -53,7 +53,7 @@ export function PlayerDetail({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground min-h-0! min-w-0! text-xs underline"
+            className="text-muted-foreground text-xs underline"
           >
             Close
           </button>
