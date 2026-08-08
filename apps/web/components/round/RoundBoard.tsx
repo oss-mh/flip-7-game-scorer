@@ -350,7 +350,10 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           >
             Scoreboard
           </button>
-          <Link href={`/game/${gameId}/history`} className="text-muted-foreground text-xs underline">
+          <Link
+            href={`/game/${gameId}/history`}
+            className="text-muted-foreground text-xs underline"
+          >
             History
           </Link>
           <Link href={`/game/${gameId}/replay`} className="text-muted-foreground text-xs underline">
@@ -360,163 +363,184 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         </div>
       </div>
 
-      {!state.purist && <CardCounterPanel remaining={remaining} />}
+      {/*
+       * Tablet landscape gets a second column rather than just wider
+       * single-column flow (#50): the counter panel moves out of the
+       * document flow above the lanes and becomes a persistent sidebar,
+       * so it doesn't cost lane width or need a collapse toggle once
+       * there's room to show it permanently.
+       */}
+      <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {!state.purist && <CardCounterPanel remaining={remaining} className="lg:hidden" />}
 
-      {flipped7Player && (
-        <p
-          role="status"
-          className="border-status-flipped7 bg-status-flipped7/10 text-status-flipped7 animate-pulse rounded-lg border-2 p-2 text-center font-semibold"
-        >
-          ★ {flipped7Player.name} flipped 7! Round over for everyone. ★
-        </p>
-      )}
+          {flipped7Player && (
+            <p
+              role="status"
+              className="border-status-flipped7 bg-status-flipped7/10 text-status-flipped7 animate-pulse rounded-lg border-2 p-2 text-center font-semibold"
+            >
+              ★ {flipped7Player.name} flipped 7! Round over for everyone. ★
+            </p>
+          )}
 
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {state.players.map((player) => {
-          const playerRound = round.players[player.id];
-          if (!playerRound) return null;
-          return (
-            <PlayerLane
-              key={player.id}
-              player={player}
-              playerRound={playerRound}
-              isDealer={player.id === round.dealerId}
-              isCurrentPlayer={player.id === currentPlayerId}
-              bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
-              onSelect={() => selectPlayer(player.id)}
-              onLongPressCard={(card) => {
-                setCorrectionError(null);
-                setCorrectionTarget({ playerId: player.id, card });
-              }}
-            />
-          );
-        })}
-      </ul>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {state.players.map((player) => {
+              const playerRound = round.players[player.id];
+              if (!playerRound) return null;
+              return (
+                <PlayerLane
+                  key={player.id}
+                  player={player}
+                  playerRound={playerRound}
+                  isDealer={player.id === round.dealerId}
+                  isCurrentPlayer={player.id === currentPlayerId}
+                  bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
+                  onSelect={() => selectPlayer(player.id)}
+                  onLongPressCard={(card) => {
+                    setCorrectionError(null);
+                    setCorrectionTarget({ playerId: player.id, card });
+                  }}
+                />
+              );
+            })}
+          </ul>
 
-      {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
+          {actionError && <p className="text-status-busted text-sm">{actionError}</p>}
 
-      {canEnterManualMode && !manualMode && !roundOver && !pending && (
-        <button
-          type="button"
-          className="text-muted-foreground self-center text-xs underline"
-          onClick={handleEnterManualMode}
-        >
-          Enter scores manually instead
-        </button>
-      )}
+          {canEnterManualMode && !manualMode && !roundOver && !pending && (
+            <button
+              type="button"
+              className="text-muted-foreground self-center text-xs underline"
+              onClick={handleEnterManualMode}
+            >
+              Enter scores manually instead
+            </button>
+          )}
 
-      <div className="mt-auto flex flex-col gap-3">
-        {pending?.kind === "awaiting-target" ? (
-          <ActionTargetPrompt
-            card={pending.card}
-            sourcePlayerId={pending.sourcePlayerId}
-            round={round}
-            players={state.players}
-            busy={busy}
-            onResolve={(targetId) =>
-              void handleResolveTarget(pending.card, pending.sourcePlayerId, targetId)
-            }
-          />
-        ) : pending?.kind === "forced-draw-remaining" ? (
-          <FlipThreeSequence
-            resolution={pending}
-            upNext={round.pendingResolutions.slice(1)}
-            round={round}
-            players={state.players}
-            remaining={remaining}
-            purist={state.purist}
-            busy={busy}
-            onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
-          />
-        ) : manualMode ? (
-          <ManualScoreEntry
-            round={round}
-            players={state.players}
-            busy={busy}
-            onSubmit={(scores) => void handleManualScores(scores)}
-            onCancel={() => setManualMode(false)}
-          />
-        ) : initialDeal.active && initialDealTargetId ? (
-          <InitialDeal
-            round={round}
-            players={state.players}
-            targetPlayerId={initialDealTargetId}
-            remaining={remaining}
-            purist={state.purist}
-            busy={busy}
-            onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
-            onSkip={initialDeal.skip}
-          />
-        ) : justClosed ? (
-          <RoundSummary
-            round={round}
-            players={state.players}
-            cumulativeScores={state.cumulativeScores}
-            busy={busy}
-            gameOver={gameOver}
-            winners={winners}
-            nextDealer={nextDealer}
-            deckExhausted={deckExhausted}
-            onContinue={() => void handleStartNextRound()}
-            onRematch={() => void handleRematch()}
-          />
-        ) : roundOver ? (
-          <div className="flex flex-col items-center gap-2">
-            {unusedSecondChanceHolders.length > 0 && (
-              <p className="text-card-action text-center text-xs">
-                Unused Second Chance{unusedSecondChanceHolders.length > 1 ? "s" : ""} —{" "}
-                {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
-                Close round
-              </button>
-              {isManualRound && (
-                <button
-                  type="button"
-                  className="text-muted-foreground text-xs underline"
-                  onClick={() => setManualMode(true)}
-                >
-                  Edit scores
-                </button>
-              )}
-            </div>
-          </div>
-        ) : currentPlayerId && currentLegal ? (
-          <>
-            {showPicker ? (
-              <CardPicker
-                cardsDealt={round.cardsDealt}
+          <div className="mt-auto flex flex-col gap-3">
+            {pending?.kind === "awaiting-target" ? (
+              <ActionTargetPrompt
+                card={pending.card}
+                sourcePlayerId={pending.sourcePlayerId}
+                round={round}
+                players={state.players}
+                busy={busy}
+                onResolve={(targetId) =>
+                  void handleResolveTarget(pending.card, pending.sourcePlayerId, targetId)
+                }
+              />
+            ) : pending?.kind === "forced-draw-remaining" ? (
+              <FlipThreeSequence
+                resolution={pending}
+                upNext={round.pendingResolutions.slice(1)}
+                round={round}
+                players={state.players}
                 remaining={remaining}
                 purist={state.purist}
-                onDeal={(card) => void handleHitDeal(card)}
-                disabled={busy}
+                busy={busy}
+                onDeal={(card) => void handleForcedDraw(pending.playerId, card)}
               />
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1"
-                  disabled={busy || !currentLegal.moves.includes("hit")}
-                  onClick={() => setShowPicker(true)}
-                >
-                  Hit
-                </button>
-                <button
-                  type="button"
-                  className="flex-1"
-                  disabled={busy || !currentLegal.moves.includes("stay")}
-                  onClick={() => void handleStay()}
-                  title={currentLegal.reasons.stay}
-                >
-                  Stay
-                </button>
+            ) : manualMode ? (
+              <ManualScoreEntry
+                round={round}
+                players={state.players}
+                busy={busy}
+                onSubmit={(scores) => void handleManualScores(scores)}
+                onCancel={() => setManualMode(false)}
+              />
+            ) : initialDeal.active && initialDealTargetId ? (
+              <InitialDeal
+                round={round}
+                players={state.players}
+                targetPlayerId={initialDealTargetId}
+                remaining={remaining}
+                purist={state.purist}
+                busy={busy}
+                onDeal={(card) => void handleInitialDeal(initialDealTargetId, card)}
+                onSkip={initialDeal.skip}
+              />
+            ) : justClosed ? (
+              <RoundSummary
+                round={round}
+                players={state.players}
+                cumulativeScores={state.cumulativeScores}
+                busy={busy}
+                gameOver={gameOver}
+                winners={winners}
+                nextDealer={nextDealer}
+                deckExhausted={deckExhausted}
+                onContinue={() => void handleStartNextRound()}
+                onRematch={() => void handleRematch()}
+              />
+            ) : roundOver ? (
+              <div className="flex flex-col items-center gap-2">
+                {unusedSecondChanceHolders.length > 0 && (
+                  <p className="text-card-action text-center text-xs">
+                    Unused Second Chance{unusedSecondChanceHolders.length > 1 ? "s" : ""} —{" "}
+                    {unusedSecondChanceHolders.join(", ")} — will be discarded, not carried over.
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => void handleCloseRound()} disabled={busy}>
+                    Close round
+                  </button>
+                  {isManualRound && (
+                    <button
+                      type="button"
+                      className="text-muted-foreground text-xs underline"
+                      onClick={() => setManualMode(true)}
+                    >
+                      Edit scores
+                    </button>
+                  )}
+                </div>
               </div>
+            ) : currentPlayerId && currentLegal ? (
+              <>
+                {showPicker ? (
+                  <CardPicker
+                    cardsDealt={round.cardsDealt}
+                    remaining={remaining}
+                    purist={state.purist}
+                    onDeal={(card) => void handleHitDeal(card)}
+                    disabled={busy}
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1"
+                      disabled={busy || !currentLegal.moves.includes("hit")}
+                      onClick={() => setShowPicker(true)}
+                    >
+                      Hit
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1"
+                      disabled={busy || !currentLegal.moves.includes("stay")}
+                      onClick={() => void handleStay()}
+                      title={currentLegal.reasons.stay}
+                    >
+                      Stay
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-center text-sm">
+                Waiting for an active player…
+              </p>
             )}
-          </>
-        ) : (
-          <p className="text-muted-foreground text-center text-sm">Waiting for an active player…</p>
+          </div>
+        </div>
+
+        {!state.purist && (
+          <CardCounterPanel
+            remaining={remaining}
+            persistent
+            className="hidden lg:block lg:w-72 lg:shrink-0"
+          />
         )}
       </div>
 
