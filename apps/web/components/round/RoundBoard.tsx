@@ -15,8 +15,10 @@ import { useEffect, useRef, useState } from "react";
 import { totalRemainingCards } from "@/lib/cardCatalog";
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
+import { triggerFeedback } from "@/lib/feedback";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { buildRoundAnnouncements } from "@/lib/roundAnnouncements";
+import { buildFeedbackTriggers } from "@/lib/roundFeedback";
 import { nextDealerId } from "@/lib/turnOrder";
 import { useWakeLock } from "@/lib/useWakeLock";
 
@@ -34,12 +36,40 @@ import { useCurrentPlayer } from "./useCurrentPlayer";
 import { useInitialDeal } from "./useInitialDeal";
 
 import type { GameQuery } from "@/lib/gameProvider";
-import type { ActionCard, Card, Player, PlayerId, PlayerRoundStatus } from "@flip-7/engine";
+import type {
+  ActionCard,
+  Card,
+  Player,
+  PlayerId,
+  PlayerRoundStatus,
+  RoundState,
+} from "@flip-7/engine";
 
 type ReadyGame = Extract<GameQuery, { status: "ready" }>;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Seeds the status-diff ref with whatever's already true when the board
+ * mounts (reopening the app mid-round after someone already busted, say) —
+ * without this, the first diff would compare against an empty map and see
+ * every already-busted/frozen/flipped7 player as a change happening right
+ * now, firing an announcement and a bust/freeze/Flip-7 vibration for
+ * something that isn't actually happening this render.
+ */
+function initialStatuses(
+  round: RoundState | null,
+  players: readonly Player[],
+): Map<PlayerId, PlayerRoundStatus> {
+  const statuses = new Map<PlayerId, PlayerRoundStatus>();
+  if (!round) return statuses;
+  for (const player of players) {
+    const status = round.players[player.id]?.status;
+    if (status) statuses.set(player.id, status);
+  }
+  return statuses;
 }
 
 /**
@@ -93,12 +123,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const justClosed = events.length > 0 && events[events.length - 1]?.t === "RoundClosed";
   useWakeLock(round !== null && !justClosed);
 
-  // Screen-reader announcements for dealt cards, status changes and score
-  // updates — see lib/roundAnnouncements.ts. Refs, not state, for the
+  // Screen-reader announcements (lib/roundAnnouncements.ts) and
+  // haptic/sound feedback (lib/roundFeedback.ts) for dealt cards, status
+  // changes and score updates, off the same diff. Refs, not state, for the
   // "previous" snapshots: they exist purely to diff against next render,
   // never to drive one themselves.
   const previousEventsLengthRef = useRef(events.length);
-  const previousStatusesRef = useRef<Map<PlayerId, PlayerRoundStatus>>(new Map());
+  const previousStatusesRef = useRef<Map<PlayerId, PlayerRoundStatus>>(
+    initialStatuses(round, state.players),
+  );
   const [announcement, setAnnouncement] = useState("");
   useEffect(() => {
     const newEvents = events.slice(previousEventsLengthRef.current);
@@ -112,6 +145,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
       cumulativeScores: state.cumulativeScores,
     });
     if (messages.length > 0) setAnnouncement(messages.join(" "));
+
+    const triggers = buildFeedbackTriggers({
+      newEvents,
+      players: state.players,
+      round,
+      previousStatuses: previousStatusesRef.current,
+    });
+    for (const trigger of triggers) triggerFeedback(trigger);
 
     const nextStatuses = new Map<PlayerId, PlayerRoundStatus>();
     for (const player of state.players) {

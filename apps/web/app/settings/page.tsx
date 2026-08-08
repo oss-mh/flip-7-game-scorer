@@ -12,6 +12,8 @@ function toErrorMessage(value: unknown): string {
 export default function SettingsPage() {
   const repository = useGameRepository();
   const [wakeLockEnabled, setWakeLockEnabled] = usePreference("wakeLockEnabled", true);
+  const [hapticsEnabled, setHapticsEnabled] = usePreference("hapticsEnabled", true);
+  const [soundEnabled, setSoundEnabled] = usePreference("soundEnabled", false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cleared, setCleared] = useState(false);
@@ -59,6 +61,33 @@ export default function SettingsPage() {
             onChange={(event) => setWakeLockEnabled(event.target.checked)}
           />
           Keep screen awake during a round
+        </label>
+      </section>
+
+      <section className="flex w-full max-w-md flex-col gap-3 rounded border border-border p-4">
+        <div>
+          <h2 className="font-semibold">Sound &amp; haptics</h2>
+          <p className="text-muted-foreground text-sm">
+            Distinct feedback for a card dealt, a bust, a freeze and a Flip 7. Vibration is
+            skipped automatically if your device has reduced motion turned on; sound already
+            respects silent mode.
+          </p>
+        </div>
+        <label className="min-h-touch flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={hapticsEnabled}
+            onChange={(event) => setHapticsEnabled(event.target.checked)}
+          />
+          Haptics
+        </label>
+        <label className="min-h-touch flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={soundEnabled}
+            onChange={(event) => setSoundEnabled(event.target.checked)}
+          />
+          Sound
         </label>
       </section>
 
