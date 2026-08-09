@@ -21,6 +21,7 @@ import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { buildRoundAnnouncements } from "@/lib/roundAnnouncements";
 import { buildFeedbackTriggers } from "@/lib/roundFeedback";
 import { nextDealerId } from "@/lib/turnOrder";
+import { useLiveGameSync } from "@/lib/useLiveGameSync";
 import { useWakeLock } from "@/lib/useWakeLock";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
@@ -92,6 +93,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const router = useRouter();
   const { id: gameId } = useParams<{ id: string }>();
   const repository = useGameRepository();
+  const presentDevices = useLiveGameSync(gameId);
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
     round,
@@ -410,6 +412,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
             >
               Share
             </button>
+          )}
+          {presentDevices.length > 1 && (
+            <span
+              className="text-muted-foreground text-xs"
+              title={presentDevices.map((device) => (device.isYou ? "You" : device.label)).join(", ")}
+            >
+              {presentDevices.length} here
+            </span>
           )}
           <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
         </div>

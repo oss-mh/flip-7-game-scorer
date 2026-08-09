@@ -14,6 +14,7 @@ export { HttpGameRepository } from "./httpGameRepository.js";
 export { InMemoryGameRepository } from "./inMemoryGameRepository.js";
 export { LocalStorageGameRepository } from "./localStorageGameRepository.js";
 export type {
+  RemoteChangeNotifiable,
   RemoteGameAdopter,
   SyncResolution,
   SyncStatus,
@@ -23,6 +24,7 @@ export {
   OfflineQueueGameRepository,
   adoptRemoteGame,
   getSyncStatus,
+  notifyRemoteChange,
   subscribeSyncStatus,
 } from "./offlineQueueGameRepository.js";
 export {

@@ -13,6 +13,7 @@ import {
   OfflineQueueGameRepository,
   adoptRemoteGame,
   getSyncStatus,
+  notifyRemoteChange,
 } from "../offlineQueueGameRepository.js";
 import { runRepositoryContractTests } from "../testing/repositoryContract.js";
 
@@ -131,6 +132,26 @@ async function waitUntil(check: () => Promise<boolean>, timeoutMs = 2000): Promi
   }
 }
 
+/**
+ * Waits for `remote` to hold at least `length` events for `gameId` — the
+ * background sync's own `createGame` call on remote hasn't necessarily
+ * landed yet by the time this is first polled, so a `GameNotFoundError` is
+ * "not yet", not a real failure.
+ */
+async function waitForRemoteLength(
+  remote: GameRepository,
+  gameId: string,
+  length: number,
+): Promise<void> {
+  await waitUntil(async () => {
+    try {
+      return (await remote.loadEvents(gameId)).length === length;
+    } catch {
+      return false;
+    }
+  });
+}
+
 describe("OfflineQueueGameRepository", () => {
   it("returns from a write immediately even when remote is offline", async () => {
     const remote = new FlakyGameRepository();
@@ -164,16 +185,7 @@ describe("OfflineQueueGameRepository", () => {
     // go through the same `#kick`.
     await repo.loadEvents("game-1");
 
-    await waitUntil(async () => {
-      // Remote never got as far as `createGame` while offline, so it
-      // legitimately doesn't know this game yet until the flush's own
-      // create-then-append round finishes.
-      try {
-        return (await remoteInner.loadEvents("game-1")).length === 2;
-      } catch {
-        return false;
-      }
-    });
+    await waitForRemoteLength(remoteInner, "game-1", 2);
     expect(getSyncStatus(repo, "game-1").pendingCount).toBe(0);
   });
 
@@ -245,6 +257,25 @@ describe("OfflineQueueGameRepository", () => {
       await expect(local.loadEvents("game-1")).resolves.toEqual([first, second]);
     });
 
+    it("also pulls remote's snapshot, if it has one, for #91's 'catch up from snapshot plus events'", async () => {
+      const local = new InMemoryGameRepository();
+      const remote = new InMemoryGameRepository();
+      const repo = new OfflineQueueGameRepository({ local, remote });
+
+      const meta = buildMeta();
+      await remote.createGame(meta);
+      await remote.appendEvents("game-1", [buildEvent(0)], 0);
+      await remote.saveSnapshot("game-1", 1, initialState);
+
+      await adoptRemoteGame(repo, "game-1");
+
+      await expect(local.loadSnapshot("game-1")).resolves.toEqual({
+        version: 1,
+        schemaVersion: EVENT_SCHEMA_VERSION,
+        state: initialState,
+      });
+    });
+
     it("rejects adopting a game remote doesn't know either", async () => {
       const repo = new OfflineQueueGameRepository({
         local: new InMemoryGameRepository(),
@@ -257,6 +288,41 @@ describe("OfflineQueueGameRepository", () => {
     it("is a no-op for a plain GameRepository that doesn't support adoption", async () => {
       const repo = new InMemoryGameRepository();
       await expect(adoptRemoteGame(repo, "game-1")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("notifyRemoteChange (#91, live sync)", () => {
+    it("pulls a remote-only event into local when notified", async () => {
+      const local = new InMemoryGameRepository();
+      const remote = new InMemoryGameRepository();
+      const repo = new OfflineQueueGameRepository({ local, remote });
+      await repo.createGame(buildMeta());
+      // remote only gains the game via the background sync #90 kicks off
+      // after a local write — wait for that before writing to remote
+      // directly, the same way the "flushes queued events" test above does.
+      await waitUntil(async () => {
+        try {
+          return (await remote.loadEvents("game-1")).length === 0;
+        } catch {
+          return false;
+        }
+      });
+
+      // Simulates another device pushing an event straight to remote —
+      // the scenario a realtime postgres_changes notification (or its
+      // polling fallback) fires for.
+      const event = buildEvent(0);
+      await remote.appendEvents("game-1", [event], 0);
+
+      notifyRemoteChange(repo, "game-1");
+
+      await waitUntil(async () => (await local.loadEvents("game-1")).length === 1);
+      await expect(local.loadEvents("game-1")).resolves.toEqual([event]);
+    });
+
+    it("is a no-op for a plain GameRepository that doesn't support it", () => {
+      const repo = new InMemoryGameRepository();
+      expect(() => notifyRemoteChange(repo, "game-1")).not.toThrow();
     });
   });
 
@@ -273,7 +339,7 @@ describe("OfflineQueueGameRepository", () => {
       // unreachable.
       await repo.createGame(buildMeta());
       await repo.appendEvents("game-1", [buildEvent(0, "2026-08-08T00:00:00.000Z")], 0);
-      await waitUntil(async () => (await remoteInner.loadEvents("game-1")).length === 1);
+      await waitForRemoteLength(remoteInner, "game-1", 1);
 
       remote.setOffline(true);
       await repo.appendEvents(
@@ -316,7 +382,7 @@ describe("OfflineQueueGameRepository", () => {
 
       await repo.createGame(buildMeta());
       await repo.appendEvents("game-1", [buildEvent(0, "2026-08-08T00:00:00.000Z")], 0);
-      await waitUntil(async () => (await remoteInner.loadEvents("game-1")).length === 1);
+      await waitForRemoteLength(remoteInner, "game-1", 1);
 
       remote.setOffline(true);
       await repo.appendEvents(

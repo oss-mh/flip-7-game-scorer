@@ -200,6 +200,13 @@ beforeAll(async () => {
     create role anon nologin;
     create role authenticated nologin;
     grant usage on schema public to anon, authenticated;
+    -- A real Supabase project creates this publication itself; the
+    -- realtime migration (20260809100000) just adds a table to it. Plain
+    -- Postgres has no such publication yet, and this rig runs no
+    -- realtime server to actually stream changes anyway (see that
+    -- migration's comment) — this exists purely so "alter publication
+    -- ... add table" has something to alter.
+    create publication supabase_realtime;
   `);
 
   psql(migrationSql());

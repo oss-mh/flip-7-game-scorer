@@ -92,6 +92,32 @@ export async function adoptRemoteGame(repo: GameRepository, gameId: GameId): Pro
   }
 }
 
+/**
+ * Duck-typed like the others above — see docs/adr/0005. The realtime
+ * subscription (#91, `apps/web/lib/useLiveGameSync.ts`) lives outside this
+ * class entirely, in a browser-only React hook: it just calls this when a
+ * Postgres change notification (or its polling fallback) fires, and the
+ * existing #90 sync machinery in `#syncOnce` takes it from there. This
+ * class stays transport-agnostic — it still has no idea Realtime exists,
+ * only that *something* is telling it "go check remote now."
+ */
+export interface RemoteChangeNotifiable {
+  notifyRemoteChange(gameId: GameId): void;
+}
+
+function hasRemoteChangeNotifiable(
+  repo: GameRepository,
+): repo is GameRepository & RemoteChangeNotifiable {
+  return typeof (repo as Partial<RemoteChangeNotifiable>).notifyRemoteChange === "function";
+}
+
+/** Works on any `GameRepository`; a no-op where there's no remote to have changed. */
+export function notifyRemoteChange(repo: GameRepository, gameId: GameId): void {
+  if (hasRemoteChangeNotifiable(repo)) {
+    repo.notifyRemoteChange(gameId);
+  }
+}
+
 function sameEvent(a: StoredEvent, b: StoredEvent): boolean {
   return a.seq === b.seq && a.t === b.t && a.at === b.at;
 }
@@ -127,7 +153,7 @@ function toMessage(error: unknown): string {
  * method here returns or throws.
  */
 export class OfflineQueueGameRepository
-  implements GameRepository, SyncStatusSource, RemoteGameAdopter
+  implements GameRepository, SyncStatusSource, RemoteGameAdopter, RemoteChangeNotifiable
 {
   readonly #local: GameRepository;
   readonly #remote: GameRepository;
@@ -232,10 +258,16 @@ export class OfflineQueueGameRepository
 
   /**
    * Pulls a game this device has just gained access to (redeemed a join
-   * code for, see docs/adr/0005-adjacent #92 work) from `remote` into
-   * `local`. Safe to call again for a game already known locally — e.g.
-   * re-redeeming the same code — since it only appends whatever `local`
-   * doesn't have yet rather than assuming it's starting from empty.
+   * code for, see #92) from `remote` into `local` — meta, the full event
+   * log (every other read path in this app assumes the stored log is
+   * complete from position 0, so a snapshot is never a substitute for
+   * that, only an addition), and, if `remote` has one, its snapshot too so
+   * this device's own future reads can use `loadGameState`'s fast path
+   * instead of a cold full fold — the "catch up from snapshot plus
+   * events" #91 asks for. Safe to call again for a game already known
+   * locally — e.g. re-redeeming the same code — since it only appends
+   * whatever `local` doesn't have yet rather than assuming it's starting
+   * from empty.
    */
   async adoptRemoteGame(gameId: GameId): Promise<void> {
     const remoteMetas = await this.#remote.listGames();
@@ -244,6 +276,7 @@ export class OfflineQueueGameRepository
       throw new GameNotFoundError(gameId);
     }
     const remoteEvents = await this.#remote.loadEvents(gameId);
+    const remoteSnapshot = await this.#remote.loadSnapshot(gameId).catch(() => null);
 
     await this.#withLocalGuard(gameId, async () => {
       try {
@@ -260,9 +293,18 @@ export class OfflineQueueGameRepository
           localEvents.length,
         );
       }
+
+      if (remoteSnapshot) {
+        await this.#local.saveSnapshot(gameId, remoteSnapshot.version, remoteSnapshot.state);
+      }
     });
 
     this.#setStatus(gameId, SYNCED);
+  }
+
+  /** See `RemoteChangeNotifiable` — a realtime push (or its polling fallback) telling this device to check `remote` now. */
+  notifyRemoteChange(gameId: GameId): void {
+    this.#kick(gameId);
   }
 
   getSyncStatus(gameId: GameId): SyncStatus {
@@ -309,19 +351,34 @@ export class OfflineQueueGameRepository
       });
   }
 
-  /** Fire-and-forget: never awaited by a port method, so a caller never waits on the network. */
+  /**
+   * Fire-and-forget: never awaited by a port method, so a caller never
+   * waits on the network. Scheduled via `setTimeout`, not called inline —
+   * a caller like `createGame` (see `apps/web/lib/createGame.ts`) often
+   * immediately follows with its own client-side work, e.g. `router.push`
+   * to the new game. Next.js serializes Server Action dispatches per
+   * client ("Next.js dispatches Server Actions one at a time per client",
+   * per its own Server Actions guide), and starting this kick's Server
+   * Action call in the exact same synchronous tick as that other
+   * client-side work was observed to stall the navigation — a real,
+   * reproduced hang, not a theoretical one. A macrotask boundary is enough
+   * separation to avoid it, and background sync has no latency
+   * requirement that a few extra milliseconds costs anything for.
+   */
   #kick(gameId: GameId): void {
     if (this.#syncing.has(gameId)) {
       this.#rerunRequested.add(gameId);
       return;
     }
     this.#syncing.add(gameId);
-    void this.#syncOnce(gameId).finally(() => {
-      this.#syncing.delete(gameId);
-      if (this.#rerunRequested.delete(gameId)) {
-        this.#kick(gameId);
-      }
-    });
+    setTimeout(() => {
+      void this.#syncOnce(gameId).finally(() => {
+        this.#syncing.delete(gameId);
+        if (this.#rerunRequested.delete(gameId)) {
+          this.#kick(gameId);
+        }
+      });
+    }, 0);
   }
 
   async #findLocalMeta(gameId: GameId): Promise<GameMeta | null> {
