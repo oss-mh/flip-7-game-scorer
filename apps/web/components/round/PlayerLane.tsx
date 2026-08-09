@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { faceLabel, faceOfCard } from "@/lib/cardCatalog";
 
 import { DealtCardTile } from "./DealtCardTile";
+import { NumericKeypad } from "./NumericKeypad";
 import { ScoreBreakdownLine } from "./ScoreBreakdownLine";
 import { StatusBadge } from "./StatusBadge";
 
@@ -27,8 +28,11 @@ export function PlayerLane({
   isDealer,
   isCurrentPlayer,
   bustRisk,
+  canToggleManual,
+  manualEntryBusy = false,
   onSelect,
   onLongPressCard,
+  onManualScoreSubmit,
 }: {
   readonly player: Player;
   readonly playerRound: PlayerRoundState;
@@ -36,19 +40,62 @@ export function PlayerLane({
   readonly isCurrentPlayer: boolean;
   /** Chance the next card dealt busts this hand (#83) — null to hide it entirely (purist mode, #40). */
   readonly bustRisk: number | null;
+  /** Whether this lane may switch to (or edit) manual scoring right now — see RoundBoard for the gating (#79). */
+  readonly canToggleManual: boolean;
+  readonly manualEntryBusy?: boolean;
   readonly onSelect: () => void;
   /** Mistap correction (#74) — long-press a dealt card to remove or replace it. */
   readonly onLongPressCard?: (card: Card) => void;
+  /** Records this player's round score directly, switching them to manual mid-round (#79). */
+  readonly onManualScoreSubmit?: (points: number) => void;
 }) {
   const score = scoreRound(playerRound);
   const isBusted = playerRound.status === "busted";
   const isFlipped7 = playerRound.status === "flipped7";
   const isActive = playerRound.status === "active";
-  // A manually scored player never has cards to show — surfacing "no cards
-  // yet" and a unique-number count for them would read as a broken
-  // card-tracked lane rather than the first-class mode AGENTS.md calls for.
   const isManual = playerRound.status === "manual";
+  // A switch to manual mid-round preserves whatever cards were already
+  // dealt (#79) rather than discarding them, so a manual player can still
+  // have a hand worth showing — only a player who went manual from the
+  // start of the round has none.
   const hasCards = playerRound.numberCards.length > 0 || playerRound.modifierCards.length > 0;
+
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualValue, setManualValue] = useState("");
+
+  // `PlayerLane` stays mounted across round boundaries (keyed by player.id,
+  // not roundNumber), so a keypad left open unsaved would otherwise survive
+  // into the next round showing stale digits. `status` always changes on a
+  // fresh round — every player who was active this round leaves "active"
+  // before RoundClosed can fire, then resets back to "active" for the next
+  // one — so closing on any status change is a reliable reset (#79).
+  const statusRef = useRef(playerRound.status);
+  useEffect(() => {
+    if (statusRef.current !== playerRound.status) {
+      statusRef.current = playerRound.status;
+      setManualEntryOpen(false);
+    }
+  }, [playerRound.status]);
+
+  function openManualEntry() {
+    const seed = isManual ? playerRound.manualScore : score.total;
+    setManualValue(seed !== null && seed !== undefined ? String(seed) : "");
+    setManualEntryOpen(true);
+  }
+
+  function appendDigit(digit: string) {
+    setManualValue((previous) => (previous === "0" ? digit : previous + digit));
+  }
+
+  function backspace() {
+    setManualValue((previous) => previous.slice(0, -1));
+  }
+
+  function submitManualEntry() {
+    if (manualValue === "") return;
+    onManualScoreSubmit?.(Number(manualValue));
+    setManualEntryOpen(false);
+  }
 
   // A held Second Chance goes non-null → null two ways: it just saved a bust
   // (playerRound.status is still "active" — the near-miss worth celebrating,
@@ -136,7 +183,7 @@ export function PlayerLane({
         </div>
       )}
 
-      {!isManual && (
+      {(!isManual || hasCards) && (
         <div className="flex flex-wrap gap-1">
           {hasCards ? (
             playerRound.numberCards.map((card) => (
@@ -155,10 +202,49 @@ export function PlayerLane({
         </div>
       )}
 
+      {canToggleManual &&
+        (isActive || isManual) &&
+        (manualEntryOpen ? (
+          <div className="border-status-manual/60 flex flex-col gap-2 rounded-lg border p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-xs">Enter round score</span>
+              <button
+                type="button"
+                className="text-muted-foreground text-xs underline"
+                onClick={() => setManualEntryOpen(false)}
+              >
+                Cancel
+              </button>
+            </div>
+            <span className="text-lg font-semibold tabular-nums">{manualValue || "0"}</span>
+            <NumericKeypad
+              onDigit={appendDigit}
+              onBackspace={backspace}
+              disabled={manualEntryBusy}
+              compact
+            />
+            <button
+              type="button"
+              disabled={manualEntryBusy || manualValue === ""}
+              onClick={submitManualEntry}
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="text-status-manual w-fit text-xs underline"
+            onClick={openManualEntry}
+          >
+            {isManual ? "Edit manual score" : "Score manually"}
+          </button>
+        ))}
+
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-0.5">
           <span className="text-muted-foreground text-xs">
-            {!isManual &&
+            {(!isManual || hasCards) &&
               `${playerRound.numberCards.length} unique number${playerRound.numberCards.length === 1 ? "" : "s"}`}
           </span>
           {isActive && bustRisk !== null && (

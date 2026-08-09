@@ -4,9 +4,9 @@ import { useState } from "react";
 
 import { seatOrderFromDealer } from "@/lib/turnOrder";
 
-import type { Player, PlayerId, RoundState } from "@flip-7/engine";
+import { NumericKeypad } from "./NumericKeypad";
 
-const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Next"] as const;
+import type { Player, PlayerId, RoundState } from "@flip-7/engine";
 
 function playerName(players: readonly Player[], playerId: PlayerId): string {
   return players.find((player) => player.id === playerId)?.name ?? playerId;
@@ -115,23 +115,13 @@ export function ManualScoreEntry({
         })}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {KEYPAD_KEYS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              if (key === "⌫") backspace();
-              else if (key === "Next") goToNextPlayer();
-              else appendDigit(key);
-            }}
-            className="border-border rounded-lg border-2 py-3 text-lg font-semibold"
-          >
-            {key}
-          </button>
-        ))}
-      </div>
+      <NumericKeypad
+        onDigit={appendDigit}
+        onBackspace={backspace}
+        extraKeys={["Next"]}
+        onExtraKey={goToNextPlayer}
+        disabled={busy}
+      />
 
       <button type="button" disabled={busy || !allEntered} onClick={handleSubmit}>
         Save scores
