@@ -3,6 +3,7 @@
 import { exportGame } from "@flip-7/adapters";
 import { useState } from "react";
 
+import { downloadJson } from "@/lib/downloadJson";
 import { buildErrorReport, formatErrorReport } from "@/lib/errorContext";
 import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { revertToLastGoodState } from "@/lib/recoverGame";
@@ -11,16 +12,6 @@ import type { GameState } from "@flip-7/engine";
 
 function toErrorMessage(value: unknown): string {
   return value instanceof Error ? value.message : String(value);
-}
-
-function downloadJson(filename: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 /**

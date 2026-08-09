@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ShareGamePanel } from "@/components/ShareGamePanel";
 import { totalRemainingCards } from "@/lib/cardCatalog";
 import { findCardDealtEvent } from "@/lib/cardCorrection";
 import { createGame } from "@/lib/createGame";
@@ -20,6 +21,7 @@ import { useGameRepository } from "@/lib/gameRepositoryContext";
 import { buildRoundAnnouncements } from "@/lib/roundAnnouncements";
 import { buildFeedbackTriggers } from "@/lib/roundFeedback";
 import { nextDealerId } from "@/lib/turnOrder";
+import { useLiveGameSync } from "@/lib/useLiveGameSync";
 import { useWakeLock } from "@/lib/useWakeLock";
 
 import { ActionTargetPrompt } from "./ActionTargetPrompt";
@@ -91,6 +93,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const router = useRouter();
   const { id: gameId } = useParams<{ id: string }>();
   const repository = useGameRepository();
+  const presentDevices = useLiveGameSync(gameId);
   const round = state.currentRound;
   const { currentPlayerId, markTurnAction, cancelTurnAction, selectPlayer } = useCurrentPlayer(
     round,
@@ -109,6 +112,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   }, [round]);
   const [busy, setBusy] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [correctionTarget, setCorrectionTarget] = useState<{
     readonly playerId: PlayerId;
@@ -400,6 +404,23 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           <Link href={`/game/${gameId}/replay`} className="text-muted-foreground text-xs underline">
             Replay
           </Link>
+          {process.env.NEXT_PUBLIC_STORAGE_ADAPTER === "http" && (
+            <button
+              type="button"
+              className="text-muted-foreground flex items-center justify-center text-xs underline"
+              onClick={() => setShowShare(true)}
+            >
+              Share
+            </button>
+          )}
+          {presentDevices.length > 1 && (
+            <span
+              className="text-muted-foreground text-xs"
+              title={presentDevices.map((device) => (device.isYou ? "You" : device.label)).join(", ")}
+            >
+              {presentDevices.length} here
+            </span>
+          )}
           <span className="text-muted-foreground text-sm">Target {state.targetScore}</span>
         </div>
       </div>
@@ -609,6 +630,8 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
           onClose={() => setShowScoreboard(false)}
         />
       )}
+
+      {showShare && <ShareGamePanel gameId={gameId} onClose={() => setShowShare(false)} />}
     </div>
   );
 }
