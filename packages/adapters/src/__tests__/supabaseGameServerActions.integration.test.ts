@@ -273,7 +273,10 @@ function makeRepo(): GameRepository {
 function buildMeta(id: string): GameMeta {
   return {
     id,
-    players: [{ id: "alice", name: "Alice" }],
+    players: [
+      { id: "alice", name: "Alice" },
+      { id: "bob", name: "Bob" },
+    ],
     targetScore: 200,
     createdAt: "2026-08-08T00:00:00.000Z",
     archivedAt: null,
