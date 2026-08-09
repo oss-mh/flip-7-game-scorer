@@ -44,10 +44,13 @@ const SECTIONS = groupByKind();
  */
 export function CardCounterPanel({
   remaining,
+  hasManualPlayers = false,
   persistent = false,
   className = "",
 }: {
   readonly remaining: RemainingDeckReport;
+  /** At least one player this round is scored manually (#79) — their physically-drawn cards were never logged as `CardDealt`, so the counts below can't see them. */
+  readonly hasManualPlayers?: boolean;
   readonly persistent?: boolean;
   readonly className?: string;
 }) {
@@ -75,6 +78,12 @@ export function CardCounterPanel({
             {total} left {expanded ? "▲" : "▼"}
           </span>
         </button>
+      )}
+
+      {hasManualPlayers && (
+        <p className="text-muted-foreground border-border border-t px-3 py-1.5 text-[11px]">
+          Counts tracked players only — manual players&apos; cards aren&apos;t logged, so these may run high.
+        </p>
       )}
 
       {expanded && (

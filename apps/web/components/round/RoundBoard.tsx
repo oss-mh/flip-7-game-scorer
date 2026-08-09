@@ -101,6 +101,20 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   );
   const initialDeal = useInitialDeal(round, state.players);
   const [showPicker, setShowPicker] = useState(false);
+  // The Hit picker is bound to whichever player is current at the moment a
+  // card is tapped, not whichever player it was opened for — so if the
+  // current player changes out from under an open picker (an out-of-order
+  // `selectPlayer` jump, or this device's own player switching to manual
+  // mid-turn — #79 — or another device doing either over live sync), a tap
+  // must not silently deal to the new target. Closing it forces a fresh
+  // "Hit" for whoever's current now.
+  const currentPlayerIdRef = useRef(currentPlayerId);
+  useEffect(() => {
+    if (currentPlayerIdRef.current !== currentPlayerId) {
+      currentPlayerIdRef.current = currentPlayerId;
+      setShowPicker(false);
+    }
+  }, [currentPlayerId]);
   const [manualMode, setManualMode] = useState(false);
   const manualModeRoundRef = useRef<number | null>(null);
   useEffect(() => {
@@ -188,6 +202,15 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
   const initialDealTargetId = initialDeal.nextSeatId;
   const canEnterManualMode = round.cardsDealt.length === 0;
   const isManualRound = state.players.every(
+    (player) => round.players[player.id]?.status === "manual",
+  );
+  // A per-player switch to manual (#79) is only safe to offer when there's
+  // no resolution mid-flight for someone else and the round hasn't already
+  // ended — same guard the bulk "enter scores manually" link uses, plus
+  // suppressed while that bulk keypad itself is open so there's only ever
+  // one manual-entry control live at a time.
+  const canToggleManualPerPlayer = !pending && !roundOver && !manualMode;
+  const hasManualPlayers = state.players.some(
     (player) => round.players[player.id]?.status === "manual",
   );
   const gameOver = state.status === "completed";
@@ -361,6 +384,18 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
     setManualMode(true);
   }
 
+  async function handlePlayerManualScore(playerId: PlayerId, points: number) {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch([{ t: "ManualScoreEntered", playerId, points }]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleManualScores(scores: ReadonlyMap<PlayerId, number>) {
     setActionError(null);
     setBusy(true);
@@ -434,7 +469,13 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
        */}
       <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          {!state.purist && <CardCounterPanel remaining={remaining} className="lg:hidden" />}
+          {!state.purist && (
+            <CardCounterPanel
+              remaining={remaining}
+              hasManualPlayers={hasManualPlayers}
+              className="lg:hidden"
+            />
+          )}
 
           {flipped7Player && (
             <p
@@ -457,11 +498,14 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
                   isDealer={player.id === round.dealerId}
                   isCurrentPlayer={player.id === currentPlayerId}
                   bustRisk={state.purist ? null : bustProbability(state, remaining, player.id)}
+                  canToggleManual={canToggleManualPerPlayer}
+                  manualEntryBusy={busy}
                   onSelect={() => selectPlayer(player.id)}
                   onLongPressCard={(card) => {
                     setCorrectionError(null);
                     setCorrectionTarget({ playerId: player.id, card });
                   }}
+                  onManualScoreSubmit={(points) => void handlePlayerManualScore(player.id, points)}
                 />
               );
             })}
@@ -600,6 +644,7 @@ export function RoundBoard({ game }: { readonly game: ReadyGame }) {
         {!state.purist && (
           <CardCounterPanel
             remaining={remaining}
+            hasManualPlayers={hasManualPlayers}
             persistent
             className="hidden lg:block lg:w-72 lg:shrink-0"
           />
