@@ -163,15 +163,15 @@ export default function NewGamePage() {
           </span>
         </label>
 
-        <div className="flex gap-2">
+        <div className="flex min-w-0 gap-2">
           <input
-            className="flex-1 rounded border border-border bg-surface px-3"
+            className="min-w-0 flex-1 rounded border border-border bg-surface px-3"
             style={{ minHeight: "var(--touch-target)" }}
             placeholder="Player name"
             value={nameInput}
             onChange={(event) => setNameInput(event.target.value)}
           />
-          <button type="button" onClick={() => addPlayer(nameInput)}>
+          <button type="button" className="shrink-0" onClick={() => addPlayer(nameInput)}>
             Add
           </button>
         </div>
@@ -188,45 +188,55 @@ export default function NewGamePage() {
 
         <ol className="flex flex-col gap-2">
           {players.map((player, index) => (
-            <li key={player.id} className="flex items-center gap-2 rounded border border-border p-2">
-              <span className="text-muted-foreground w-6 text-center">{index + 1}</span>
-              <input
-                className="flex-1 rounded border border-border bg-surface px-2"
-                style={{ minHeight: "var(--touch-target)" }}
-                value={player.name}
-                onChange={(event) => renamePlayer(player.id, event.target.value)}
-                aria-label={`Player ${index + 1} name`}
-              />
-              <button
-                type="button"
-                onClick={() => movePlayer(player.id, -1)}
-                disabled={index === 0}
-                aria-label={`Move ${player.name || "player"} up`}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => movePlayer(player.id, 1)}
-                disabled={index === players.length - 1}
-                aria-label={`Move ${player.name || "player"} down`}
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                aria-pressed={dealerId === player.id}
-                onClick={() => setDealerId(player.id)}
-              >
-                {dealerId === player.id ? "Dealing first" : "Deal first"}
-              </button>
-              <button
-                type="button"
-                onClick={() => removePlayer(player.id)}
-                aria-label={`Remove ${player.name || "player"}`}
-              >
-                Remove
-              </button>
+            <li key={player.id} className="flex flex-col gap-2 rounded border border-border p-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-muted-foreground w-5 shrink-0 text-center text-sm">
+                  {index + 1}
+                </span>
+                <input
+                  className="min-w-0 flex-1 rounded border border-border bg-surface px-2"
+                  style={{ minHeight: "var(--touch-target)" }}
+                  value={player.name}
+                  onChange={(event) => renamePlayer(player.id, event.target.value)}
+                  aria-label={`Player ${index + 1} name`}
+                />
+                <button
+                  type="button"
+                  className="text-status-busted shrink-0"
+                  onClick={() => removePlayer(player.id)}
+                  aria-label={`Remove ${player.name || "player"}`}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex min-w-0 items-center gap-2 pl-7">
+                <button
+                  type="button"
+                  className="shrink-0"
+                  onClick={() => movePlayer(player.id, -1)}
+                  disabled={index === 0}
+                  aria-label={`Move ${player.name || "player"} up`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0"
+                  onClick={() => movePlayer(player.id, 1)}
+                  disabled={index === players.length - 1}
+                  aria-label={`Move ${player.name || "player"} down`}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate"
+                  aria-pressed={dealerId === player.id}
+                  onClick={() => setDealerId(player.id)}
+                >
+                  {dealerId === player.id ? "Dealing first" : "Deal first"}
+                </button>
+              </div>
             </li>
           ))}
         </ol>

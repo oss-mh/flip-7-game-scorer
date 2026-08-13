@@ -99,7 +99,10 @@ export function CardPicker({
                   onClick={() => onDeal(nextCardForFace(cardsDealt, face))}
                   aria-label={`Deal ${label}${exhausted ? ", none left" : ""}`}
                   className={[
-                    "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 text-base font-semibold",
+                    "relative flex h-12 shrink-0 items-center justify-center rounded-lg border-2 font-semibold",
+                    kind === "action"
+                      ? "w-auto min-w-12 whitespace-nowrap px-2 text-xs leading-tight"
+                      : "w-12 text-base",
                     CARD_KIND_CLASSES[kind],
                     exhausted ? "opacity-35" : "",
                   ].join(" ")}
